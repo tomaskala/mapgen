@@ -1,62 +1,145 @@
 package streamline
 
 import (
-	"slices"
+	"container/heap"
 
 	"tomaskala.com/mapgen/field"
 )
 
-type Streamline []field.Vector
+type Streamline struct {
+	seed  field.Vector
+	back  []field.Vector
+	front []field.Vector
+}
+
+func (s Streamline) Points() []field.Vector {
+	points := make([]field.Vector, len(s.back)+1+len(s.front))
+
+	for i, p := range s.back {
+		points[len(s.back)-1-i] = p
+	}
+
+	points[len(s.back)] = s.seed
+	copy(points[len(s.back)+1:], s.front)
+
+	return points
+}
 
 type Tracer struct {
-	grid       *Grid
 	tf         field.TensorField
 	rkStep     float64
+	dSep       float64
 	dTest      float64
 	dLookahead float64
 	maxLength  float64
 }
 
-func NewTracer(grid *Grid, tf field.TensorField, rkStep, dTest, dLookahead, maxLength float64) Tracer {
+func NewTracer(tf field.TensorField, rkStep, dSep, dTest, dLookahead, maxLength float64) Tracer {
 	return Tracer{
-		grid:       grid,
 		tf:         tf,
 		rkStep:     rkStep,
+		dSep:       dSep,
 		dTest:      dTest,
 		dLookahead: dLookahead,
 		maxLength:  maxLength,
 	}
 }
 
-func (t Tracer) Trace(seed field.Vector) {
-	// TODO: Jobard and Lefer's algorithm.
+func (t Tracer) Trace(majorGrid, minorGrid *Grid, seeds []field.Vector) ([]Streamline, []Streamline) {
+	priority := func(field.Vector) float64 {
+		// TODO: Calculate priority based on the paper.
+		return 0.0
+	}
+
+	var majorLines, minorLines []Streamline
+	dSepSq := t.dSep * t.dSep
+
+	pq := make(PriorityQueue, len(seeds))
+	for i, seed := range seeds {
+		pq[i] = Item{
+			p:        seed,
+			self:     Family{majorGrid, &majorLines, field.Tensor.MajorEigenvector},
+			other:    Family{minorGrid, &minorLines, field.Tensor.MinorEigenvector},
+			priority: priority(seed),
+		}
+	}
+	heap.Init(&pq)
+
+	for pq.Len() > 0 {
+		curr := heap.Pop(&pq).(Item)
+		if !curr.self.grid.IsInBounds(curr.p) || curr.self.grid.IsTooClose(curr.p, dSepSq) {
+			continue
+		}
+
+		line := t.traceStreamline(curr)
+		*curr.self.lines = append(*curr.self.lines, line)
+
+		next, found := findNextSeed(line, dSepSq)
+		if found {
+			heap.Push(&pq, Item{
+				p:        next,
+				self:     curr.other,
+				other:    curr.self,
+				priority: priority(next),
+			})
+		}
+	}
+
+	return majorLines, minorLines
 }
 
-func (t Tracer) traceStreamline(seed field.Vector, sel field.EigenSelector) Streamline {
-	forward := sel(t.tf.Evaluate(seed))
+func findNextSeed(line Streamline, dSepSq float64) (field.Vector, bool) {
+	forward, forwardFound := findFirstBeyond(line.seed, line.front, dSepSq)
+	backward, backwardFound := findFirstBeyond(line.seed, line.back, dSepSq)
+
+	switch {
+	case forwardFound && backwardFound:
+		if line.seed.Sub(forward).NormSquared() < line.seed.Sub(backward).NormSquared() {
+			return forward, true
+		}
+		return backward, true
+	case forwardFound:
+		return forward, true
+	case backwardFound:
+		return backward, true
+	default:
+		return field.Vector{}, false
+	}
+}
+
+func findFirstBeyond(seed field.Vector, halfline []field.Vector, dSepSq float64) (field.Vector, bool) {
+	for _, p := range halfline {
+		if seed.Sub(p).NormSquared() >= dSepSq {
+			return p, true
+		}
+	}
+	return field.Vector{}, false
+}
+
+func (t Tracer) traceStreamline(item Item) Streamline {
+	forward := item.self.sel(t.tf.Evaluate(item.p))
 	backward := forward.Mul(-1.0)
-	t.grid.Add(seed)
+	item.self.grid.Add(item.p)
 
-	front := t.traceHalfline(seed, forward, sel)
-	back := t.traceHalfline(seed, backward, sel)
-	slices.Reverse(back)
-
-	back = append(back, seed)
-	return append(back, front...)
+	return Streamline{
+		seed:  item.p,
+		back:  t.traceHalfline(item, backward),
+		front: t.traceHalfline(item, forward),
+	}
 }
 
-func (t Tracer) traceHalfline(seed, dir field.Vector, sel field.EigenSelector) Streamline {
-	var halfline Streamline
+func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
+	var halfline []field.Vector
 	dist := 0.0
 	dTestSq := t.dTest * t.dTest
-	curr := seed
+	curr := item.p
 
 	for {
-		dir, curr = t.step(dir, curr, sel)
+		dir, curr = t.step(dir, curr, item.self.sel)
 		dist += dir.Norm()
 
 		// Stopping criteria (1): out of domain boundary.
-		if !t.grid.IsInBounds(curr) {
+		if !item.self.grid.IsInBounds(curr) {
 			break
 		}
 
@@ -66,27 +149,29 @@ func (t Tracer) traceHalfline(seed, dir field.Vector, sel field.EigenSelector) S
 		}
 
 		// Stopping criteria (3): loop.
-		if dist > t.dTest && curr.Sub(seed).NormSquared() < dTestSq {
+		if dist > t.dTest && curr.Sub(item.p).NormSquared() < dTestSq {
 			break
 		}
 
 		// Stopping criteria (4): length exceeded.
 		if dist > t.maxLength {
-			if lookahead, found := t.lookahead(dir, curr, sel); found {
+			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
+				item.self.grid.Add(lookahead)
 				halfline = append(halfline, lookahead)
 			}
 			break
 		}
 
 		// Stopping criteria (5): too close to an existing streamline.
-		if t.grid.IsTooClose(curr, dTestSq) {
-			if lookahead, found := t.lookahead(dir, curr, sel); found {
+		if item.self.grid.IsTooClose(curr, dTestSq) {
+			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
+				item.self.grid.Add(lookahead)
 				halfline = append(halfline, lookahead)
 			}
 			break
 		}
 
-		t.grid.Add(curr) // Ignore the boolean, we have already tested out of bounds in (1).
+		item.self.grid.Add(curr) // Ignore the boolean, we have already tested out of bounds in (1).
 		halfline = append(halfline, curr)
 	}
 
@@ -99,7 +184,7 @@ func (t Tracer) step(dir, curr field.Vector, sel field.EigenSelector) (field.Vec
 	return delta, next
 }
 
-func (t Tracer) lookahead(dir, curr field.Vector, sel field.EigenSelector) (field.Vector, bool) {
+func (t Tracer) lookahead(grid *Grid, dir, curr field.Vector, sel field.EigenSelector) (field.Vector, bool) {
 	dist := 0.0
 	dTestSq := t.dTest * t.dTest
 
@@ -107,11 +192,11 @@ func (t Tracer) lookahead(dir, curr field.Vector, sel field.EigenSelector) (fiel
 		dir, curr = t.step(dir, curr, sel)
 		dist += dir.Norm()
 
-		if !t.grid.IsInBounds(curr) {
+		if !grid.IsInBounds(curr) {
 			break
 		}
 
-		if t.grid.IsTooClose(curr, dTestSq) {
+		if grid.IsTooClose(curr, dTestSq) {
 			return curr, true
 		}
 	}

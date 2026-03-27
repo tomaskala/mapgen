@@ -39,6 +39,7 @@ func Radial(center Vector, radius float64) BasisField {
 func (bf BasisField) Evaluate(p Vector) Tensor {
 	switch bf.typ {
 	case BasisGrid:
+		// A grid is spatially constant.
 		return bf.baseTensor
 	case BasisRadial:
 		u := p.Sub(bf.center)

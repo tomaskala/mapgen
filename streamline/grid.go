@@ -10,7 +10,7 @@ type Grid struct {
 	width  int
 	height int
 	dsep   float64
-	grid   [][]field.Vector
+	cells  [][]field.Vector
 }
 
 func NewGrid(width, height int, dsep float64) *Grid {
@@ -27,7 +27,7 @@ func (g *Grid) Add(v field.Vector) bool {
 	}
 
 	off := g.offset(cx, cy)
-	g.grid[off] = append(g.grid[off], v)
+	g.cells[off] = append(g.cells[off], v)
 	return true
 }
 
@@ -44,7 +44,7 @@ func (g *Grid) Neighbors(v field.Vector) []field.Vector {
 			if nx < 0 || nx >= g.width || ny < 0 || ny >= g.height {
 				continue
 			}
-			neighbors = append(neighbors, g.grid[g.offset(nx, ny)]...)
+			neighbors = append(neighbors, g.cells[g.offset(nx, ny)]...)
 		}
 	}
 
@@ -52,9 +52,8 @@ func (g *Grid) Neighbors(v field.Vector) []field.Vector {
 }
 
 func (g *Grid) IsInBounds(v field.Vector) bool {
-	cx := int(v.X / g.dsep)
-	cy := int(v.Y / g.dsep)
-	return cx >= 0 && cx < g.width && cy >= 0 && cy < g.height
+	_, _, ok := g.cell(v)
+	return ok
 }
 
 func (g *Grid) IsTooClose(v field.Vector, minDistSq float64) bool {
@@ -70,7 +69,7 @@ func (g *Grid) IsTooClose(v field.Vector, minDistSq float64) bool {
 				continue
 			}
 
-			neighbors := g.grid[g.offset(nx, ny)]
+			neighbors := g.cells[g.offset(nx, ny)]
 			for _, n := range neighbors {
 				if v.Sub(n).NormSquared() < minDistSq {
 					return true
