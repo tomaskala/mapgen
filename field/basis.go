@@ -16,7 +16,7 @@ type BasisField struct {
 	baseTensor Tensor // Only used by the grid field.
 }
 
-func NewGrid(center, direction Vector, radius float64) BasisField {
+func Grid(center, direction Vector, radius float64) BasisField {
 	l := direction.Norm()
 	theta := math.Atan2(direction.Y, direction.X)
 	baseTensor := GridTensor(l, theta)
@@ -28,7 +28,7 @@ func NewGrid(center, direction Vector, radius float64) BasisField {
 	}
 }
 
-func NewRadial(center Vector, radius float64) BasisField {
+func Radial(center Vector, radius float64) BasisField {
 	return BasisField{
 		typ:    BasisRadial,
 		center: center,

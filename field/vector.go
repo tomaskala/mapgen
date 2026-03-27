@@ -2,7 +2,7 @@ package field
 
 import "math"
 
-const eps = 1e-9
+const Eps = 1e-9
 
 type Vector struct {
 	X float64
@@ -27,7 +27,7 @@ func (v Vector) Dot(w Vector) float64 {
 
 func (v Vector) Normalized() Vector {
 	norm := v.Norm()
-	if norm < eps {
+	if norm < Eps {
 		return Vector{}
 	}
 	return v.Mul(1.0 / norm)

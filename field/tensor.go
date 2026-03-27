@@ -20,9 +20,13 @@ func (t Tensor) Mul(alpha float64) Tensor {
 	return Tensor(Vector(t).Mul(alpha))
 }
 
+func (t Tensor) NormSquared() float64 {
+	return Vector(t).NormSquared()
+}
+
 func (t Tensor) MajorEigenvector() Vector {
 	norm := Vector(t).Norm()
-	if norm < eps {
+	if norm < Eps {
 		return Vector{1.0, 0.0}
 	}
 

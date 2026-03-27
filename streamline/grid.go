@@ -51,12 +51,17 @@ func (g *Grid) Neighbors(v field.Vector) []field.Vector {
 	return neighbors
 }
 
-func (g *Grid) IsTooClose(v field.Vector, minDist float64) bool {
+func (g *Grid) IsInBounds(v field.Vector) bool {
+	cx := int(v.X / g.dsep)
+	cy := int(v.Y / g.dsep)
+	return cx >= 0 && cx < g.width && cy >= 0 && cy < g.height
+}
+
+func (g *Grid) IsTooClose(v field.Vector, minDistSq float64) bool {
 	cx, cy, ok := g.cell(v)
 	if !ok {
 		return false
 	}
-	minDist2 := minDist * minDist
 
 	for dy := -1; dy <= 1; dy++ {
 		for dx := -1; dx <= 1; dx++ {
@@ -67,7 +72,7 @@ func (g *Grid) IsTooClose(v field.Vector, minDist float64) bool {
 
 			neighbors := g.grid[g.offset(nx, ny)]
 			for _, n := range neighbors {
-				if v.Sub(n).NormSquared() < minDist2 {
+				if v.Sub(n).NormSquared() < minDistSq {
 					return true
 				}
 			}
