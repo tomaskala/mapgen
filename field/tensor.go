@@ -25,7 +25,7 @@ func (t Tensor) Mul(alpha float64) Tensor {
 }
 
 func (t Tensor) NormSquared() float64 {
-	return 2.0 * (t.a*t.a + t.b*t.b)
+	return t.a*t.a + t.b*t.b
 }
 
 func (t Tensor) Norm() float64 {

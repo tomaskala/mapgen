@@ -27,20 +27,20 @@ func (s Streamline) Points() []field.Vector {
 
 type Tracer struct {
 	tf         field.TensorField
-	rkStep     float64
 	dSep       float64
 	dTest      float64
 	dLookahead float64
+	rkStep     float64
 	maxLength  float64
 }
 
-func NewTracer(tf field.TensorField, rkStep, dSep, dTest, dLookahead, maxLength float64) Tracer {
+func NewTracer(tf field.TensorField, dSep, dTest, dLookahead, rkStep, maxLength float64) Tracer {
 	return Tracer{
 		tf:         tf,
-		rkStep:     rkStep,
 		dSep:       dSep,
 		dTest:      dTest,
 		dLookahead: dLookahead,
+		rkStep:     rkStep,
 		maxLength:  maxLength,
 	}
 }
@@ -119,12 +119,18 @@ func findFirstBeyond(seed field.Vector, halfline []field.Vector, dSepSq float64)
 func (t Tracer) traceStreamline(item Item) Streamline {
 	forward := item.self.sel(t.tf.Evaluate(item.p))
 	backward := forward.Mul(-1.0)
+
+	back := t.traceHalfline(item, backward)
+	front := t.traceHalfline(item, forward)
+
 	item.self.grid.Add(item.p)
+	item.self.grid.AddAll(back)
+	item.self.grid.AddAll(front)
 
 	return Streamline{
 		seed:  item.p,
-		back:  t.traceHalfline(item, backward),
-		front: t.traceHalfline(item, forward),
+		back:  back,
+		front: front,
 	}
 }
 
@@ -156,7 +162,6 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 		// Stopping criteria (4): length exceeded.
 		if dist > t.maxLength {
 			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
-				item.self.grid.Add(lookahead)
 				halfline = append(halfline, lookahead)
 			}
 			break
@@ -165,13 +170,11 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 		// Stopping criteria (5): too close to an existing streamline.
 		if item.self.grid.IsTooClose(curr, dTestSq) {
 			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
-				item.self.grid.Add(lookahead)
 				halfline = append(halfline, lookahead)
 			}
 			break
 		}
 
-		item.self.grid.Add(curr) // Ignore the boolean, we have already tested out of bounds in (1).
 		halfline = append(halfline, curr)
 	}
 
