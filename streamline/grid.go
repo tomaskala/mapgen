@@ -32,23 +32,6 @@ func (g *Grid) AddAll(vs []field.Vector) {
 	}
 }
 
-func (g *Grid) Neighbors(v field.Vector) []field.Vector {
-	cx, cy := g.cell(v)
-	var neighbors []field.Vector
-
-	for dy := -1; dy <= 1; dy++ {
-		for dx := -1; dx <= 1; dx++ {
-			nx, ny := cx+dx, cy+dy
-			if nx < 0 || nx >= g.width || ny < 0 || ny >= g.height {
-				continue
-			}
-			neighbors = append(neighbors, g.cells[g.offset(nx, ny)]...)
-		}
-	}
-
-	return neighbors
-}
-
 func (g *Grid) IsInBounds(v field.Vector) bool {
 	cx := int(v.X / g.cellSize)
 	cy := int(v.Y / g.cellSize)
@@ -59,16 +42,14 @@ func (g *Grid) IsInBounds(v field.Vector) bool {
 func (g *Grid) IsTooClose(v field.Vector, minDistSq float64) bool {
 	cx, cy := g.cell(v)
 
-	for dy := -1; dy <= 1; dy++ {
-		for dx := -1; dx <= 1; dx++ {
-			nx, ny := cx+dx, cy+dy
+	for ny := cy - 1; ny <= cy+1; ny++ {
+		for nx := cx - 1; nx <= cx+1; nx++ {
 			if nx < 0 || nx >= g.width || ny < 0 || ny >= g.height {
 				continue
 			}
 
-			neighbors := g.cells[g.offset(nx, ny)]
-			for _, n := range neighbors {
-				if v.Sub(n).NormSquared() < minDistSq {
+			for _, neighbor := range g.cells[g.offset(nx, ny)] {
+				if v.Sub(neighbor).NormSquared() < minDistSq {
 					return true
 				}
 			}

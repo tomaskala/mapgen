@@ -5,6 +5,7 @@ import (
 
 	"github.com/fogleman/gg"
 	"tomaskala.com/mapgen/field"
+	"tomaskala.com/mapgen/graph"
 	"tomaskala.com/mapgen/streamline"
 )
 
@@ -69,6 +70,8 @@ func main() {
 	tracer := streamline.NewTracer(tf, dSep, dTest, dLookahead, rkStep, maxLength)
 	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
 
+	intersections := graph.FindIntersections(width, height, dSep, majorLines, minorLines)
+
 	dc := gg.NewContext(width, height)
 
 	dc.SetHexColor("#FF0000")
@@ -100,6 +103,12 @@ func main() {
 	}
 	dc.SetLineWidth(4)
 	dc.Stroke()
+
+	dc.SetHexColor("#0000FF")
+	for _, intersection := range intersections {
+		dc.DrawPoint(intersection.P.X, intersection.P.Y, 10.0)
+	}
+	dc.Fill()
 
 	dc.SavePNG(output)
 }
