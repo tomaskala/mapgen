@@ -7,17 +7,17 @@ import (
 )
 
 type Grid struct {
-	width  int
-	height int
-	dSep   float64
-	cells  [][]field.Vector
+	width    int
+	height   int
+	cellSize float64
+	cells    [][]field.Vector
 }
 
-func NewGrid(width, height int, dSep float64) *Grid {
-	w := int(math.Ceil(float64(width) / dSep))
-	h := int(math.Ceil(float64(height) / dSep))
-	grid := make([][]field.Vector, w*h)
-	return &Grid{w, h, dSep, grid}
+func NewGrid(width, height int, cellSize float64) *Grid {
+	w := int(math.Ceil(float64(width) / cellSize))
+	h := int(math.Ceil(float64(height) / cellSize))
+	cells := make([][]field.Vector, w*h)
+	return &Grid{w, h, cellSize, cells}
 }
 
 func (g *Grid) Add(v field.Vector) {
@@ -50,8 +50,8 @@ func (g *Grid) Neighbors(v field.Vector) []field.Vector {
 }
 
 func (g *Grid) IsInBounds(v field.Vector) bool {
-	cx := int(v.X / g.dSep)
-	cy := int(v.Y / g.dSep)
+	cx := int(v.X / g.cellSize)
+	cy := int(v.Y / g.cellSize)
 
 	return cx >= 0 && cx < g.width && cy >= 0 && cy < g.height
 }
@@ -79,8 +79,8 @@ func (g *Grid) IsTooClose(v field.Vector, minDistSq float64) bool {
 }
 
 func (g *Grid) cell(v field.Vector) (int, int) {
-	cx := int(v.X / g.dSep)
-	cy := int(v.Y / g.dSep)
+	cx := int(v.X / g.cellSize)
+	cy := int(v.Y / g.cellSize)
 	return cx, cy
 }
 
