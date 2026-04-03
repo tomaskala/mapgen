@@ -7,21 +7,21 @@ import (
 	"tomaskala.com/mapgen/field"
 )
 
-type Grid struct {
+type grid struct {
 	width    int
 	height   int
 	cellSize float64
-	cells    [][]Segment
+	cells    [][]segment
 }
 
-func NewGrid(width, height int, cellSize float64) *Grid {
+func newGrid(width, height int, cellSize float64) *grid {
 	w := int(math.Ceil(float64(width) / cellSize))
 	h := int(math.Ceil(float64(height) / cellSize))
-	cells := make([][]Segment, w*h)
-	return &Grid{w, h, cellSize, cells}
+	cells := make([][]segment, w*h)
+	return &grid{w, h, cellSize, cells}
 }
 
-func (g *Grid) Add(s Segment) {
+func (g *grid) add(s segment) {
 	x0, y0 := g.cell(s.a)
 	x1, y1 := g.cell(s.b)
 
@@ -54,9 +54,9 @@ func (g *Grid) Add(s Segment) {
 	}
 }
 
-func (g *Grid) Neighbors(s Segment) iter.Seq[Segment] {
-	return func(yield func(Segment) bool) {
-		seen := make(map[Segment]struct{})
+func (g *grid) neighbors(s segment) iter.Seq[segment] {
+	return func(yield func(segment) bool) {
+		seen := make(map[segment]struct{})
 
 		x0, y0 := g.cell(s.a)
 		x1, y1 := g.cell(s.b)
@@ -90,7 +90,7 @@ func (g *Grid) Neighbors(s Segment) iter.Seq[Segment] {
 	}
 }
 
-func (g *Grid) iterateNeighborhood(seen map[Segment]struct{}, x, y int, yield func(Segment) bool) bool {
+func (g *grid) iterateNeighborhood(seen map[segment]struct{}, x, y int, yield func(segment) bool) bool {
 	for ny := y - 1; ny <= y+1; ny++ {
 		for nx := x - 1; nx <= x+1; nx++ {
 			if nx < 0 || nx >= g.width || ny < 0 || ny >= g.height {
@@ -98,11 +98,13 @@ func (g *Grid) iterateNeighborhood(seen map[Segment]struct{}, x, y int, yield fu
 			}
 
 			for _, neighbor := range g.cells[g.offset(nx, ny)] {
-				if _, ok := seen[neighbor]; !ok {
-					seen[neighbor] = struct{}{}
-					if !yield(neighbor) {
-						return false
-					}
+				if _, ok := seen[neighbor]; ok {
+					continue
+				}
+
+				seen[neighbor] = struct{}{}
+				if !yield(neighbor) {
+					return false
 				}
 			}
 		}
@@ -111,13 +113,13 @@ func (g *Grid) iterateNeighborhood(seen map[Segment]struct{}, x, y int, yield fu
 	return true
 }
 
-func (g *Grid) cell(v field.Vector) (int, int) {
+func (g *grid) cell(v field.Vector) (int, int) {
 	cx := int(v.X / g.cellSize)
 	cy := int(v.Y / g.cellSize)
 	return cx, cy
 }
 
-func (g *Grid) offset(x, y int) int {
+func (g *grid) offset(x, y int) int {
 	return y*g.width + x
 }
 

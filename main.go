@@ -70,7 +70,7 @@ func main() {
 	tracer := streamline.NewTracer(tf, dSep, dTest, dLookahead, rkStep, maxLength)
 	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
 
-	intersections := graph.FindIntersections(width, height, dSep, majorLines, minorLines)
+	graph := graph.BuildGraph(width, height, dSep, majorLines, minorLines)
 
 	dc := gg.NewContext(width, height)
 
@@ -105,10 +105,24 @@ func main() {
 	dc.Stroke()
 
 	dc.SetHexColor("#0000FF")
-	for _, intersection := range intersections {
-		dc.DrawPoint(intersection.P.X, intersection.P.Y, 10.0)
+	for _, vertex := range graph.Vertices {
+		dc.DrawPoint(vertex.Pos.X, vertex.Pos.Y, 10.0)
 	}
 	dc.Fill()
+
+	dc.SetHexColor("#FFA500")
+	for _, edge := range graph.Edges {
+		if len(edge.Path) == 0 {
+			continue
+		}
+
+		dc.MoveTo(edge.Path[0].X, edge.Path[0].Y)
+		for _, p := range edge.Path[1:] {
+			dc.LineTo(p.X, p.Y)
+		}
+	}
+	dc.SetLineWidth(2)
+	dc.Stroke()
 
 	dc.SavePNG(output)
 }
