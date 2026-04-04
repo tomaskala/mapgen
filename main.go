@@ -10,6 +10,59 @@ import (
 	"tomaskala.com/mapgen/streamline"
 )
 
+type config struct {
+	numSeeds   int
+	dSep       float64
+	dTest      float64 // Must be (0.0 * dSep, 1.0 * dSep)
+	dLookahead float64
+	rkStep     float64
+	maxLength  float64
+}
+
+var mainRoadCfg = config{
+	numSeeds:   300,
+	dSep:       200.0,
+	dTest:      100.0,
+	dLookahead: 300.0,
+	rkStep:     10.0,
+	maxLength:  2000.0,
+}
+
+var majorRoadCfg = config{
+	numSeeds:   300,
+	dSep:       100.0,
+	dTest:      30.0,
+	dLookahead: 200.0,
+	rkStep:     10.0,
+	maxLength:  2000.0,
+}
+
+var minorRoadCfg = config{
+	numSeeds:   300,
+	dSep:       20.0,
+	dTest:      15.0,
+	dLookahead: 40.0,
+	rkStep:     1.0,
+	maxLength:  2000.0,
+}
+
+func buildGraph(width, height int, tf field.TensorField, cfg config, rng *rand.Rand) graph.Graph {
+	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	seeds := make([]field.Vector, cfg.numSeeds)
+	for i := range cfg.numSeeds {
+		seeds[i] = field.Vector{
+			X: rng.Float64() * float64(width),
+			Y: rng.Float64() * float64(height),
+		}
+	}
+
+	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
+	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
+
+	return graph.BuildGraph(width, height, cfg.dSep, majorLines, minorLines)
+}
+
 func main() {
 	tf := field.TensorField{
 		field.Grid(field.Vector{X: 320.0, Y: 100.0}, field.Vector{X: 1.0, Y: 0.0}, 400.0),
@@ -47,38 +100,47 @@ func main() {
 	*/
 
 	rng := rand.New(rand.NewPCG(1234, 1337))
-	numSeeds := 25
 	output := "image.png"
 	width := 800
 	height := 800
 
-	dSep := 20.0
-	dTest := 0.5 * dSep // Must be (0.0 * dSep, 1.0 * dSep)
-	dLookahead := 2.0 * dSep
-	rkStep := 0.5 * dSep
-	maxLength := 2000.0
-
-	majorGrid := streamline.NewGrid(width, height, dSep)
-	minorGrid := streamline.NewGrid(width, height, dSep)
-	seeds := make([]field.Vector, numSeeds)
-	for i := range numSeeds {
-		seeds[i] = field.Vector{
-			X: rng.Float64() * float64(width),
-			Y: rng.Float64() * float64(height),
-		}
-	}
-
-	tracer := streamline.NewTracer(tf, dSep, dTest, dLookahead, rkStep, maxLength)
-	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
-
-	graph := graph.BuildGraph(width, height, dSep, majorLines, minorLines)
+	mainGraph := buildGraph(width, height, tf, mainRoadCfg, rng)
+	majorGraph := buildGraph(width, height, tf, majorRoadCfg, rng)
+	minorGraph := buildGraph(width, height, tf, minorRoadCfg, rng)
 
 	dc := gg.NewContext(width, height)
 
-	//renderer.DebugGraph(dc, majorLines, minorLines, graph)
+	// renderer.DebugGraph(dc, majorLines, minorLines, graph)
 
-	dc.SetHexColor("#FFA500")
-	renderer.RenderGraph(dc, graph)
+	// Draw thicker in black first for the borders.
+	renderer.RenderGraph(dc, mainGraph)
+	dc.SetHexColor("#000000")
+	dc.SetLineWidth(8)
+	dc.Stroke()
+
+	renderer.RenderGraph(dc, majorGraph)
+	dc.SetHexColor("#000000")
+	dc.SetLineWidth(6)
+	dc.Stroke()
+
+	renderer.RenderGraph(dc, minorGraph)
+	dc.SetHexColor("#000000")
+	dc.SetLineWidth(4)
+	dc.Stroke()
+
+	// Draw thinner in colors for the fill.
+	renderer.RenderGraph(dc, mainGraph)
+	dc.SetHexColor("#fff600")
+	dc.SetLineWidth(6)
+	dc.Stroke()
+
+	renderer.RenderGraph(dc, majorGraph)
+	dc.SetHexColor("#708090")
+	dc.SetLineWidth(4)
+	dc.Stroke()
+
+	renderer.RenderGraph(dc, minorGraph)
+	dc.SetHexColor("#dcdcdc")
 	dc.SetLineWidth(2)
 	dc.Stroke()
 
