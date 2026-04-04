@@ -6,6 +6,7 @@ import (
 	"github.com/fogleman/gg"
 	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/graph"
+	"tomaskala.com/mapgen/renderer"
 	"tomaskala.com/mapgen/streamline"
 )
 
@@ -74,53 +75,10 @@ func main() {
 
 	dc := gg.NewContext(width, height)
 
-	dc.SetHexColor("#FF0000")
-	for _, major := range majorLines {
-		points := major.Points()
-		if len(points) == 0 {
-			continue
-		}
-
-		dc.MoveTo(points[0].X, points[0].Y)
-		for _, p := range points[1:] {
-			dc.LineTo(p.X, p.Y)
-		}
-	}
-	dc.SetLineWidth(8)
-	dc.Stroke()
-
-	dc.SetHexColor("#00FF00")
-	for _, minor := range minorLines {
-		points := minor.Points()
-		if len(points) == 0 {
-			continue
-		}
-
-		dc.MoveTo(points[0].X, points[0].Y)
-		for _, p := range points[1:] {
-			dc.LineTo(p.X, p.Y)
-		}
-	}
-	dc.SetLineWidth(4)
-	dc.Stroke()
-
-	dc.SetHexColor("#0000FF")
-	for _, vertex := range graph.Vertices {
-		dc.DrawPoint(vertex.Pos.X, vertex.Pos.Y, 10.0)
-	}
-	dc.Fill()
+	//renderer.DebugGraph(dc, majorLines, minorLines, graph)
 
 	dc.SetHexColor("#FFA500")
-	for _, edge := range graph.Edges {
-		if len(edge.Path) == 0 {
-			continue
-		}
-
-		dc.MoveTo(edge.Path[0].X, edge.Path[0].Y)
-		for _, p := range edge.Path[1:] {
-			dc.LineTo(p.X, p.Y)
-		}
-	}
+	renderer.RenderGraph(dc, graph)
 	dc.SetLineWidth(2)
 	dc.Stroke()
 
