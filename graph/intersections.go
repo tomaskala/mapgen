@@ -55,7 +55,7 @@ func BuildGraph(width, height int, cellSize float64, major, minor []streamline.S
 		vertices[i] = Vertex{Pos: intersection.pos}
 	}
 
-	edges := make([]Edge, 0, 2*len(intersections)-len(major)-len(minor))
+	var edges []Edge
 	edges = append(
 		edges,
 		extractEdges(
@@ -140,7 +140,7 @@ func extractEdges(
 	lineIDSelector, segmentIDSelector idSelector,
 	lineOffsetSelector offsetSelector,
 ) []Edge {
-	edges := make([]Edge, 0, len(intersections)-len(streamlines))
+	var edges []Edge
 	groups := make([][]intersection, len(streamlines))
 
 	for _, intersection := range intersections {

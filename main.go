@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	exitSuccess      = 0
-	exitIOError      = 1
+	exitSuccess = 0
+	exitIOError = 1
 )
 
 var (

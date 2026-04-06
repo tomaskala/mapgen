@@ -7,21 +7,36 @@ import (
 	"tomaskala.com/mapgen/field"
 )
 
+type queryCount int
+
+type segmentWithID struct {
+	id  int
+	seg segment
+}
+
 type grid struct {
-	width    int
-	height   int
-	cellSize float64
-	cells    [][]segment
+	width      int
+	height     int
+	cellSize   float64
+	cells      [][]segmentWithID
+	seen       []queryCount
+	segmentID  int
+	queryCount queryCount
 }
 
 func newGrid(width, height int, cellSize float64) *grid {
 	w := int(math.Ceil(float64(width) / cellSize))
 	h := int(math.Ceil(float64(height) / cellSize))
-	cells := make([][]segment, w*h)
-	return &grid{w, h, cellSize, cells}
+	cells := make([][]segmentWithID, w*h)
+	return &grid{width: w, height: h, cellSize: cellSize, cells: cells}
 }
 
 func (g *grid) add(s segment) {
+	if len(g.seen) == g.segmentID {
+		g.seen = append(g.seen, 0)
+	}
+	g.segmentID++
+
 	x0, y0 := g.cell(s.a)
 	x1, y1 := g.cell(s.b)
 
@@ -33,7 +48,7 @@ func (g *grid) add(s segment) {
 	for {
 		if 0 <= x && x < g.width && 0 <= y && y < g.height {
 			off := g.offset(x, y)
-			g.cells[off] = append(g.cells[off], s)
+			g.cells[off] = append(g.cells[off], segmentWithID{id: g.segmentID - 1, seg: s})
 		}
 
 		if x == x1 && y == y1 {
@@ -56,7 +71,7 @@ func (g *grid) add(s segment) {
 
 func (g *grid) neighbors(s segment) iter.Seq[segment] {
 	return func(yield func(segment) bool) {
-		seen := make(map[segment]struct{})
+		g.queryCount++
 
 		x0, y0 := g.cell(s.a)
 		x1, y1 := g.cell(s.b)
@@ -67,7 +82,7 @@ func (g *grid) neighbors(s segment) iter.Seq[segment] {
 		x, y := x0, y0
 
 		for {
-			if !g.iterateNeighborhood(seen, x, y, yield) {
+			if !g.iterateNeighborhood(x, y, yield) {
 				return
 			}
 
@@ -90,7 +105,7 @@ func (g *grid) neighbors(s segment) iter.Seq[segment] {
 	}
 }
 
-func (g *grid) iterateNeighborhood(seen map[segment]struct{}, x, y int, yield func(segment) bool) bool {
+func (g *grid) iterateNeighborhood(x, y int, yield func(segment) bool) bool {
 	for ny := y - 1; ny <= y+1; ny++ {
 		for nx := x - 1; nx <= x+1; nx++ {
 			if nx < 0 || nx >= g.width || ny < 0 || ny >= g.height {
@@ -98,12 +113,12 @@ func (g *grid) iterateNeighborhood(seen map[segment]struct{}, x, y int, yield fu
 			}
 
 			for _, neighbor := range g.cells[g.offset(nx, ny)] {
-				if _, ok := seen[neighbor]; ok {
+				if g.seen[neighbor.id] == g.queryCount {
 					continue
 				}
 
-				seen[neighbor] = struct{}{}
-				if !yield(neighbor) {
+				g.seen[neighbor.id] = g.queryCount
+				if !yield(neighbor.seg) {
 					return false
 				}
 			}
