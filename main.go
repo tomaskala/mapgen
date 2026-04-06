@@ -3,12 +3,15 @@ package main
 import (
 	"flag"
 	"log"
+	"math"
+	oldrand "math/rand"
 	"math/rand/v2"
 	"os"
 	"runtime"
 	"runtime/pprof"
 
 	"github.com/fogleman/gg"
+	"github.com/fogleman/poissondisc"
 	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/graph"
 	"tomaskala.com/mapgen/renderer"
@@ -40,7 +43,7 @@ var mainRoadCfg = config{
 	dTest:      100.0,
 	dLookahead: 300.0,
 	rkStep:     10.0,
-	maxLength:  2000.0,
+	maxLength:  1200.0,
 }
 
 var majorRoadCfg = config{
@@ -49,7 +52,7 @@ var majorRoadCfg = config{
 	dTest:      30.0,
 	dLookahead: 200.0,
 	rkStep:     10.0,
-	maxLength:  2000.0,
+	maxLength:  1000.0,
 }
 
 var minorRoadCfg = config{
@@ -58,7 +61,46 @@ var minorRoadCfg = config{
 	dTest:      15.0,
 	dLookahead: 40.0,
 	rkStep:     1.0,
-	maxLength:  2000.0,
+	maxLength:  800.0,
+}
+
+func sampleTensorField(width, height int, r float64, rng *oldrand.Rand) field.TensorField {
+	mainAngle := rng.Float64() * math.Pi / 2.0
+	numGrid := 2 + rng.Intn(3)
+	numRadial := 1 + rng.Intn(2)
+
+	tf := make(field.TensorField, numGrid+numRadial)
+	points := poissondisc.Sample(0.0, 0.0, float64(width), float64(height), r, 30, rng)
+	rng.Shuffle(len(points), func(i, j int) {
+		points[i], points[j] = points[j], points[i]
+	})
+
+	for i, p := range points[:numGrid] {
+		center := field.Vector{X: p.X, Y: p.Y}
+		theta := mainAngle + rng.NormFloat64()*math.Pi/24.0
+		dir := field.Vector{X: math.Cos(theta), Y: math.Sin(theta)}
+		radius := (0.5 + rng.Float64()*0.5) * float64(width)
+		tf[i] = field.Grid(center, dir, radius)
+	}
+
+	for i := range numRadial {
+		var center field.Vector
+		if rng.Float64() < 0.4 {
+			center = field.Vector{
+				X: float64(width) * rng.Float64() * 0.3,
+				Y: float64(height) * rng.Float64(),
+			}
+		} else {
+			center = field.Vector{
+				X: float64(width) * (0.1 + rng.Float64()*0.8),
+				Y: float64(height) * (0.1 + rng.Float64()*0.8),
+			}
+		}
+		radius := (0.25 + rng.Float64()*0.2) * float64(width)
+		tf[numGrid+i] = field.Radial(center, radius)
+	}
+
+	return tf
 }
 
 func buildGraph(width, height int, tf field.TensorField, cfg config, rng *rand.Rand) graph.Graph {
@@ -78,6 +120,32 @@ func buildGraph(width, height int, tf field.TensorField, cfg config, rng *rand.R
 	return graph.BuildGraph(width, height, cfg.dSep, majorLines, minorLines)
 }
 
+func debugGraph(output string, width, height int, tf field.TensorField, cfg config, rng *rand.Rand) int {
+	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	seeds := make([]field.Vector, cfg.numSeeds)
+	for i := range cfg.numSeeds {
+		seeds[i] = field.Vector{
+			X: rng.Float64() * float64(width),
+			Y: rng.Float64() * float64(height),
+		}
+	}
+
+	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
+	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
+
+	g := graph.BuildGraph(width, height, cfg.dSep, majorLines, minorLines)
+
+	dc := gg.NewContext(width, height)
+	renderer.DebugGraph(dc, majorLines, minorLines, g)
+
+	if err := dc.SavePNG(output); err != nil {
+		return exitIOError
+	}
+
+	return exitSuccess
+}
+
 func run() int {
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -93,53 +161,21 @@ func run() int {
 		defer pprof.StopCPUProfile()
 	}
 
-	tf := field.TensorField{
-		field.Grid(field.Vector{X: 320.0, Y: 100.0}, field.Vector{X: 1.0, Y: 0.0}, 400.0),
-		field.Grid(field.Vector{X: 120.0, Y: 700.0}, field.Vector{X: 0.0, Y: -1.0}, 300.0),
-		field.Grid(field.Vector{X: 400.0, Y: 400.0}, field.Vector{X: 1.0, Y: 1.0}, 200.0),
-		field.Radial(field.Vector{X: 200.0, Y: 200.0}, 100.0),
-		field.Radial(field.Vector{X: 350.0, Y: 500.0}, 75.0),
-	}
-
-	/*
-		// Grid only
-		tf := field.TensorField{
-			field.Grid(field.Vector{X: 400, Y: 400}, field.Vector{X: 1, Y: 0}, 600.0),
-			field.Grid(field.Vector{X: 300, Y: 300}, field.Vector{X: 1, Y: 0.4}, 150.0),
-		}
-	*/
-
-	/*
-		// Central radius
-		tf := field.TensorField{
-			field.Radial(field.Vector{X: 400, Y: 400}, 300.0),
-			field.Radial(field.Vector{X: 500, Y: 350}, 150.0),
-			field.Grid(field.Vector{X: 400, Y: 400}, field.Vector{X: 1, Y: 0}, 500.0),
-		}
-	*/
-
-	/*
-		// Radius and a curve
-		tf := field.TensorField{
-			field.Grid(field.Vector{X: 400, Y: 600}, field.Vector{X: 1, Y: 0}, 500.0),
-			field.Grid(field.Vector{X: 200, Y: 750}, field.Vector{X: 1, Y: 0.6}, 200.0),
-			field.Grid(field.Vector{X: 600, Y: 750}, field.Vector{X: 1, Y: -0.6}, 200.0),
-			field.Radial(field.Vector{X: 400, Y: 300}, 120.0),
-		}
-	*/
-
 	rng := rand.New(rand.NewPCG(1234, 1337))
+	oldRng := oldrand.New(oldrand.NewSource(5678))
 	output := "image.png"
 	width := 800
 	height := 800
+
+	tf := sampleTensorField(width, height, 50.0, oldRng)
+
+	// debugGraph(output, width, height, tf, mainRoadCfg, rng)
 
 	mainGraph := buildGraph(width, height, tf, mainRoadCfg, rng)
 	majorGraph := buildGraph(width, height, tf, majorRoadCfg, rng)
 	minorGraph := buildGraph(width, height, tf, minorRoadCfg, rng)
 
 	dc := gg.NewContext(width, height)
-
-	// renderer.DebugGraph(dc, majorLines, minorLines, graph)
 
 	// Draw thicker in black first for the borders.
 	renderer.RenderGraph(dc, mainGraph)
