@@ -132,32 +132,6 @@ func trace(
 	return tracer.Run(majorGrid, minorGrid, seeds)
 }
 
-func debugGraph(output string, width, height int, tf field.TensorField, cfg config, rng *rand.Rand) int {
-	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
-	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
-	seeds := make([]field.Vector, cfg.numSeeds)
-	for i := range cfg.numSeeds {
-		seeds[i] = field.Vector{
-			X: rng.Float64() * float64(width),
-			Y: rng.Float64() * float64(height),
-		}
-	}
-
-	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
-	trace := tracer.Run(majorGrid, minorGrid, seeds)
-
-	g := graph.BuildGraph(width, height, cfg.dSep, trace)
-
-	dc := gg.NewContext(width, height)
-	renderer.DebugGraph(dc, trace, g)
-
-	if err := dc.SavePNG(output); err != nil {
-		return exitIOError
-	}
-
-	return exitSuccess
-}
-
 func run() int {
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -180,8 +154,6 @@ func run() int {
 	height := 800
 
 	tf := sampleTensorField(width, height, 50.0, oldRng)
-
-	// debugGraph(output, width, height, tf, mainRoadCfg, rng)
 
 	var fullTrace streamline.Trace
 	mainStreamlines := trace(width, height, tf, mainRoadCfg, fullTrace, rng)

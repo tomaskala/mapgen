@@ -3,7 +3,6 @@ package renderer
 import (
 	"github.com/fogleman/gg"
 	"tomaskala.com/mapgen/graph"
-	"tomaskala.com/mapgen/streamline"
 )
 
 func RenderGraph(dc *gg.Context, g graph.Graph) {
@@ -17,42 +16,4 @@ func RenderGraph(dc *gg.Context, g graph.Graph) {
 			dc.LineTo(p.X, p.Y)
 		}
 	}
-}
-
-func DebugGraph(dc *gg.Context, trace streamline.Trace, g graph.Graph) {
-	dc.SetHexColor("#FF0000")
-	for _, major := range trace.Major {
-		points := major.Points()
-		if len(points) == 0 {
-			continue
-		}
-
-		dc.MoveTo(points[0].X, points[0].Y)
-		for _, p := range points[1:] {
-			dc.LineTo(p.X, p.Y)
-		}
-	}
-	dc.SetLineWidth(8)
-	dc.Stroke()
-
-	dc.SetHexColor("#00FF00")
-	for _, minor := range trace.Minor {
-		points := minor.Points()
-		if len(points) == 0 {
-			continue
-		}
-
-		dc.MoveTo(points[0].X, points[0].Y)
-		for _, p := range points[1:] {
-			dc.LineTo(p.X, p.Y)
-		}
-	}
-	dc.SetLineWidth(4)
-	dc.Stroke()
-
-	dc.SetHexColor("#0000FF")
-	for _, vertex := range g.Vertices {
-		dc.DrawPoint(vertex.Pos.X, vertex.Pos.Y, 10.0)
-	}
-	dc.Fill()
 }
