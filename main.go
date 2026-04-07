@@ -12,7 +12,6 @@ import (
 	"github.com/fogleman/gg"
 	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/graph"
-	"tomaskala.com/mapgen/poissondisc"
 	"tomaskala.com/mapgen/renderer"
 	"tomaskala.com/mapgen/streamline"
 )
@@ -20,6 +19,9 @@ import (
 const (
 	exitSuccess = 0
 	exitIOError = 1
+
+	initialPopFraction = 0.6
+	initialPopStep     = 4
 )
 
 var (
@@ -63,39 +65,61 @@ var minorRoadCfg = config{
 	maxLength:  800.0,
 }
 
-func sampleTensorField(width, height int, r float64, rng *rand.Rand) field.TensorField {
-	mainAngle := rng.Float64() * math.Pi / 2.0
-	numGrid := 2 + rng.IntN(3)
-	numRadial := 1 + rng.IntN(2)
+func sampleTensorField(width, height int, population field.Population, rng *rand.Rand) field.TensorField {
+	minPop := math.MaxFloat64
+	maxPop := -math.MaxFloat64
 
-	tf := make(field.TensorField, numGrid+numRadial)
-	points := poissondisc.Sample(width, height, r, 30, rng)
-	rng.Shuffle(len(points), func(i, j int) {
-		points[i], points[j] = points[j], points[i]
-	})
-
-	for i, center := range points[:numGrid] {
-		theta := mainAngle + rng.NormFloat64()*math.Pi/24.0
-		dir := field.Vector{X: math.Cos(theta), Y: math.Sin(theta)}
-		radius := (0.5 + rng.Float64()*0.5) * float64(width)
-		tf[i] = field.Grid(center, dir, radius)
+	for y := 0; y < height; y += initialPopStep {
+		for x := 0; x < width; x += initialPopStep {
+			v := field.Vector{X: float64(x), Y: float64(y)}
+			density := population.Density(v)
+			minPop = min(minPop, density)
+			maxPop = max(maxPop, density)
+		}
 	}
 
-	for i := range numRadial {
-		var center field.Vector
-		if rng.Float64() < 0.4 {
-			center = field.Vector{
-				X: float64(width) * rng.Float64() * 0.3,
-				Y: float64(height) * rng.Float64(),
-			}
-		} else {
-			center = field.Vector{
-				X: float64(width) * (0.1 + rng.Float64()*0.8),
-				Y: float64(height) * (0.1 + rng.Float64()*0.8),
+	var candidates []field.Vector
+	for y := 0; y < height; y += initialPopStep {
+		for x := 0; x < width; x += initialPopStep {
+			candidate := field.Vector{X: float64(x), Y: float64(y)}
+			if population.Density(candidate) > (maxPop-minPop)*initialPopFraction {
+				candidates = append(candidates, candidate)
 			}
 		}
-		radius := (0.25 + rng.Float64()*0.2) * float64(width)
-		tf[numGrid+i] = field.Radial(center, radius)
+	}
+
+	rng.Shuffle(len(candidates), func(i, j int) {
+		candidates[i], candidates[j] = candidates[j], candidates[i]
+	})
+
+	makeGrid := func(p field.Vector) field.BasisField {
+		theta := rng.Float64() * math.Pi
+		dir := field.Vector{X: math.Cos(theta), Y: math.Sin(theta)}
+		radius := (0.2 + 0.3*rng.Float64()) * float64(width)
+		return field.Grid(p, dir, radius)
+	}
+
+	makeRadial := func(p field.Vector) field.BasisField {
+		radius := (0.1 + 0.15*rng.Float64()) * float64(width)
+		return field.Radial(p, radius)
+	}
+
+	numGrid := 2 + rng.IntN(3)
+	numRadial := 1 + rng.IntN(2)
+	var tf field.TensorField
+
+	for i, p := range candidates {
+		if i == numGrid {
+			break
+		}
+		tf = append(tf, makeGrid(p))
+	}
+
+	for i, p := range candidates[numGrid:] {
+		if i == numRadial {
+			break
+		}
+		tf = append(tf, makeRadial(p))
 	}
 
 	return tf
@@ -152,7 +176,7 @@ func run() int {
 	height := 800
 
 	population := field.NewPopulation(0.002, 3, int64(9432))
-	tf := sampleTensorField(width, height, 50.0, rng)
+	tf := sampleTensorField(width, height, population, rng)
 
 	var fullTrace streamline.Trace
 	mainStreamlines := trace(width, height, tf, population, mainRoadCfg, fullTrace, rng)
