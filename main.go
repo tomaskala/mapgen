@@ -25,6 +25,9 @@ const (
 )
 
 var (
+	width  = flag.Int("width", 800, "image width in pixels")
+	height = flag.Int("height", 800, "image height in pixels")
+
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 )
@@ -65,12 +68,12 @@ var minorRoadCfg = config{
 	maxLength:  800.0,
 }
 
-func sampleTensorField(width, height int, population field.Population, rng *rand.Rand) field.TensorField {
+func sampleTensorField(population field.Population, rng *rand.Rand) field.TensorField {
 	minPop := math.MaxFloat64
 	maxPop := -math.MaxFloat64
 
-	for y := 0; y < height; y += initialPopStep {
-		for x := 0; x < width; x += initialPopStep {
+	for y := 0; y < *height; y += initialPopStep {
+		for x := 0; x < *width; x += initialPopStep {
 			v := field.Vector{X: float64(x), Y: float64(y)}
 			density := population.Density(v)
 			minPop = min(minPop, density)
@@ -79,8 +82,8 @@ func sampleTensorField(width, height int, population field.Population, rng *rand
 	}
 
 	var candidates []field.Vector
-	for y := 0; y < height; y += initialPopStep {
-		for x := 0; x < width; x += initialPopStep {
+	for y := 0; y < *height; y += initialPopStep {
+		for x := 0; x < *width; x += initialPopStep {
 			candidate := field.Vector{X: float64(x), Y: float64(y)}
 			if population.Density(candidate) > (maxPop-minPop)*initialPopFraction {
 				candidates = append(candidates, candidate)
@@ -95,12 +98,12 @@ func sampleTensorField(width, height int, population field.Population, rng *rand
 	makeGrid := func(p field.Vector) field.BasisField {
 		theta := rng.Float64() * math.Pi
 		dir := field.Vector{X: math.Cos(theta), Y: math.Sin(theta)}
-		radius := (0.2 + 0.3*rng.Float64()) * float64(width)
+		radius := (0.2 + 0.3*rng.Float64()) * float64(*width)
 		return field.Grid(p, dir, radius)
 	}
 
 	makeRadial := func(p field.Vector) field.BasisField {
-		radius := (0.1 + 0.15*rng.Float64()) * float64(width)
+		radius := (0.1 + 0.15*rng.Float64()) * float64(*width)
 		return field.Radial(p, radius)
 	}
 
@@ -126,7 +129,6 @@ func sampleTensorField(width, height int, population field.Population, rng *rand
 }
 
 func trace(
-	width, height int,
 	tf field.TensorField,
 	population field.Population,
 	cfg config,
@@ -136,17 +138,17 @@ func trace(
 	seeds := make([]field.Vector, cfg.numSeeds)
 	for i := range seeds {
 		seeds[i] = field.Vector{
-			X: rng.Float64() * float64(width),
-			Y: rng.Float64() * float64(height),
+			X: rng.Float64() * float64(*width),
+			Y: rng.Float64() * float64(*height),
 		}
 	}
 
-	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	majorGrid := streamline.NewGrid(*width, *height, cfg.dSep)
 	for _, major := range previous.Major {
 		majorGrid.AddAll(major.Points())
 	}
 
-	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	minorGrid := streamline.NewGrid(*width, *height, cfg.dSep)
 	for _, minor := range previous.Minor {
 		minorGrid.AddAll(minor.Points())
 	}
@@ -172,28 +174,26 @@ func run() int {
 
 	rng := rand.New(rand.NewPCG(1234, 1337))
 	output := "image.png"
-	width := 800
-	height := 800
 
 	population := field.NewPopulation(0.002, 3, int64(9432))
-	tf := sampleTensorField(width, height, population, rng)
+	tf := sampleTensorField(population, rng)
 
 	var fullTrace streamline.Trace
-	mainStreamlines := trace(width, height, tf, population, mainRoadCfg, fullTrace, rng)
+	mainStreamlines := trace(tf, population, mainRoadCfg, fullTrace, rng)
 
 	fullTrace.Major = append(fullTrace.Major, mainStreamlines.Major...)
 	fullTrace.Minor = append(fullTrace.Minor, mainStreamlines.Minor...)
-	majorStreamlines := trace(width, height, tf, population, majorRoadCfg, fullTrace, rng)
+	majorStreamlines := trace(tf, population, majorRoadCfg, fullTrace, rng)
 
 	fullTrace.Major = append(fullTrace.Major, majorStreamlines.Major...)
 	fullTrace.Minor = append(fullTrace.Minor, majorStreamlines.Minor...)
-	minorStreamlines := trace(width, height, tf, population, minorRoadCfg, fullTrace, rng)
+	minorStreamlines := trace(tf, population, minorRoadCfg, fullTrace, rng)
 
-	mainGraph := graph.BuildGraph(width, height, mainRoadCfg.dSep, mainStreamlines)
-	majorGraph := graph.BuildGraph(width, height, majorRoadCfg.dSep, majorStreamlines)
-	minorGraph := graph.BuildGraph(width, height, minorRoadCfg.dSep, minorStreamlines)
+	mainGraph := graph.BuildGraph(*width, *height, mainRoadCfg.dSep, mainStreamlines)
+	majorGraph := graph.BuildGraph(*width, *height, majorRoadCfg.dSep, majorStreamlines)
+	minorGraph := graph.BuildGraph(*width, *height, minorRoadCfg.dSep, minorStreamlines)
 
-	dc := gg.NewContext(width, height)
+	dc := gg.NewContext(*width, *height)
 
 	// Draw thicker in black first for the borders.
 	renderer.RenderGraph(dc, minorGraph)
