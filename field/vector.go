@@ -34,7 +34,11 @@ func (v Vector) normalized() Vector {
 }
 
 func (v Vector) Dist2(w Vector) float64 {
-	return v.Sub(w).Norm2()
+	return w.Sub(v).Norm2()
+}
+
+func (v Vector) Dist(w Vector) float64 {
+	return math.Hypot(w.X-v.X, w.Y-v.Y)
 }
 
 func (v Vector) Norm2() float64 {

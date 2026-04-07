@@ -140,8 +140,10 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 	curr := item.p
 
 	for {
-		dir, curr = t.step(dir, curr, item.self.sel)
-		dist += dir.Norm()
+		next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, item.self.sel)
+		dir = next.Sub(curr)
+		dist += next.Dist(curr)
+		curr = next
 
 		// Stopping criteria (1): out of domain boundary.
 		if !item.self.grid.IsInBounds(curr) {
@@ -180,19 +182,15 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 	return halfline
 }
 
-func (t Tracer) step(dir, curr field.Vector, sel field.EigenSelector) (field.Vector, field.Vector) {
-	next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, sel)
-	delta := next.Sub(curr)
-	return delta, next
-}
-
 func (t Tracer) lookahead(grid *Grid, dir, curr field.Vector, sel field.EigenSelector) (field.Vector, bool) {
 	dist := 0.0
 	dTest2 := t.dTest * t.dTest
 
 	for dist < t.dLookahead {
-		dir, curr = t.step(dir, curr, sel)
-		dist += dir.Norm()
+		next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, sel)
+		dir = next.Sub(curr)
+		dist += next.Dist(curr)
+		curr = next
 
 		if !grid.IsInBounds(curr) {
 			break
