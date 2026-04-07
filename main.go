@@ -4,16 +4,15 @@ import (
 	"flag"
 	"log"
 	"math"
-	oldrand "math/rand"
 	"math/rand/v2"
 	"os"
 	"runtime"
 	"runtime/pprof"
 
 	"github.com/fogleman/gg"
-	"github.com/fogleman/poissondisc"
 	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/graph"
+	"tomaskala.com/mapgen/poissondisc"
 	"tomaskala.com/mapgen/renderer"
 	"tomaskala.com/mapgen/streamline"
 )
@@ -64,19 +63,18 @@ var minorRoadCfg = config{
 	maxLength:  800.0,
 }
 
-func sampleTensorField(width, height int, r float64, rng *oldrand.Rand) field.TensorField {
+func sampleTensorField(width, height int, r float64, rng *rand.Rand) field.TensorField {
 	mainAngle := rng.Float64() * math.Pi / 2.0
-	numGrid := 2 + rng.Intn(3)
-	numRadial := 1 + rng.Intn(2)
+	numGrid := 2 + rng.IntN(3)
+	numRadial := 1 + rng.IntN(2)
 
 	tf := make(field.TensorField, numGrid+numRadial)
-	points := poissondisc.Sample(0.0, 0.0, float64(width), float64(height), r, 30, rng)
+	points := poissondisc.Sample(width, height, r, 30, rng)
 	rng.Shuffle(len(points), func(i, j int) {
 		points[i], points[j] = points[j], points[i]
 	})
 
-	for i, p := range points[:numGrid] {
-		center := field.Vector{X: p.X, Y: p.Y}
+	for i, center := range points[:numGrid] {
 		theta := mainAngle + rng.NormFloat64()*math.Pi/24.0
 		dir := field.Vector{X: math.Cos(theta), Y: math.Sin(theta)}
 		radius := (0.5 + rng.Float64()*0.5) * float64(width)
@@ -148,12 +146,11 @@ func run() int {
 	}
 
 	rng := rand.New(rand.NewPCG(1234, 1337))
-	oldRng := oldrand.New(oldrand.NewSource(5678))
 	output := "image.png"
 	width := 800
 	height := 800
 
-	tf := sampleTensorField(width, height, 50.0, oldRng)
+	tf := sampleTensorField(width, height, 50.0, rng)
 
 	var fullTrace streamline.Trace
 	mainStreamlines := trace(width, height, tf, mainRoadCfg, fullTrace, rng)
