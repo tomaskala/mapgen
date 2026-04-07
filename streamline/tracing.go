@@ -2,6 +2,7 @@ package streamline
 
 import (
 	"container/heap"
+	"math"
 
 	"tomaskala.com/mapgen/field"
 )
@@ -27,6 +28,7 @@ func (s Streamline) Points() []field.Vector {
 
 type Tracer struct {
 	tf         field.TensorField
+	population field.Population
 	dSep       float64
 	dTest      float64
 	dLookahead float64
@@ -34,9 +36,14 @@ type Tracer struct {
 	maxLength  float64
 }
 
-func NewTracer(tf field.TensorField, dSep, dTest, dLookahead, rkStep, maxLength float64) Tracer {
+func NewTracer(
+	tf field.TensorField,
+	population field.Population,
+	dSep, dTest, dLookahead, rkStep, maxLength float64,
+) Tracer {
 	return Tracer{
 		tf:         tf,
+		population: population,
 		dSep:       dSep,
 		dTest:      dTest,
 		dLookahead: dLookahead,
@@ -51,9 +58,10 @@ type Trace struct {
 }
 
 func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
-	priority := func(field.Vector) float64 {
-		// TODO: Calculate priority based on the paper.
-		return 0.0
+	priority := func(v field.Vector) float64 {
+		pop := t.population.Density(v)
+		const populationScale = 3.0
+		return math.Exp(populationScale * pop)
 	}
 
 	var majorLines, minorLines []Streamline

@@ -104,6 +104,7 @@ func sampleTensorField(width, height int, r float64, rng *rand.Rand) field.Tenso
 func trace(
 	width, height int,
 	tf field.TensorField,
+	population field.Population,
 	cfg config,
 	previous streamline.Trace,
 	rng *rand.Rand,
@@ -126,7 +127,7 @@ func trace(
 		minorGrid.AddAll(minor.Points())
 	}
 
-	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
+	tracer := streamline.NewTracer(tf, population, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
 	return tracer.Run(majorGrid, minorGrid, seeds)
 }
 
@@ -150,18 +151,19 @@ func run() int {
 	width := 800
 	height := 800
 
+	population := field.NewPopulation(0.002, 3, int64(9432))
 	tf := sampleTensorField(width, height, 50.0, rng)
 
 	var fullTrace streamline.Trace
-	mainStreamlines := trace(width, height, tf, mainRoadCfg, fullTrace, rng)
+	mainStreamlines := trace(width, height, tf, population, mainRoadCfg, fullTrace, rng)
 
 	fullTrace.Major = append(fullTrace.Major, mainStreamlines.Major...)
 	fullTrace.Minor = append(fullTrace.Minor, mainStreamlines.Minor...)
-	majorStreamlines := trace(width, height, tf, majorRoadCfg, fullTrace, rng)
+	majorStreamlines := trace(width, height, tf, population, majorRoadCfg, fullTrace, rng)
 
 	fullTrace.Major = append(fullTrace.Major, majorStreamlines.Major...)
 	fullTrace.Minor = append(fullTrace.Minor, majorStreamlines.Minor...)
-	minorStreamlines := trace(width, height, tf, minorRoadCfg, fullTrace, rng)
+	minorStreamlines := trace(width, height, tf, population, minorRoadCfg, fullTrace, rng)
 
 	mainGraph := graph.BuildGraph(width, height, mainRoadCfg.dSep, mainStreamlines)
 	majorGraph := graph.BuildGraph(width, height, majorRoadCfg.dSep, majorStreamlines)
