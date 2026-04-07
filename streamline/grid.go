@@ -61,7 +61,7 @@ func (g *Grid) IsTooClose(v field.Vector, minDist2 float64) bool {
 			}
 
 			for _, neighbor := range g.cells[g.offset(nx, ny)] {
-				if v.Sub(neighbor).Norm2() < minDist2 {
+				if v.Dist2(neighbor) < minDist2 {
 					return true
 				}
 			}

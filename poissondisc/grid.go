@@ -34,7 +34,7 @@ func (g *grid) add(v field.Vector) bool {
 	cx, cy := g.cell(v)
 	w := g.cells[g.offset(cx, cy)]
 
-	if w != sentinel && v.Sub(w).Norm2() < g.radius2 {
+	if w != sentinel && v.Dist2(w) < g.radius2 {
 		return false
 	}
 
@@ -47,7 +47,7 @@ func (g *grid) add(v field.Vector) bool {
 		for x := x0; x < x1; x++ {
 			w := g.cells[g.offset(x, y)]
 
-			if w != sentinel && v.Sub(w).Norm2() < g.radius2 {
+			if w != sentinel && v.Dist2(w) < g.radius2 {
 				return false
 			}
 		}

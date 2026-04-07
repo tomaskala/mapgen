@@ -33,6 +33,10 @@ func (v Vector) normalized() Vector {
 	return v.Mul(1.0 / norm)
 }
 
+func (v Vector) Dist2(w Vector) float64 {
+	return v.Sub(w).Norm2()
+}
+
 func (v Vector) Norm2() float64 {
 	return v.Dot(v)
 }

@@ -98,7 +98,7 @@ func findSeeds(line Streamline, dSep2 float64) []field.Vector {
 	prev := line.seed
 
 	for _, p := range line.front {
-		if p.Sub(prev).Norm2() >= dSep2 {
+		if p.Dist2(prev) >= dSep2 {
 			seeds = append(seeds, p)
 			prev = p
 		}
@@ -106,7 +106,7 @@ func findSeeds(line Streamline, dSep2 float64) []field.Vector {
 
 	prev = line.seed
 	for _, p := range line.back {
-		if p.Sub(prev).Norm2() >= dSep2 {
+		if p.Dist2(prev) >= dSep2 {
 			seeds = append(seeds, p)
 			prev = p
 		}
@@ -154,7 +154,7 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 		}
 
 		// Stopping criteria (3): loop.
-		if dist > t.dTest && curr.Sub(item.p).Norm2() < dTest2 {
+		if dist > t.dTest && curr.Dist2(item.p) < dTest2 {
 			break
 		}
 
