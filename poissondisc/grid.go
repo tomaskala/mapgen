@@ -9,11 +9,11 @@ import (
 var sentinel = field.Vector{X: math.Inf(-1), Y: math.Inf(-1)}
 
 type grid struct {
-	width         int
-	height        int
-	cellSize      float64
-	radiusSquared float64
-	cells         []field.Vector
+	width    int
+	height   int
+	cellSize float64
+	radius2  float64
+	cells    []field.Vector
 }
 
 func newGrid(width, height int, r float64) *grid {
@@ -27,14 +27,14 @@ func newGrid(width, height int, r float64) *grid {
 		cells[i] = sentinel
 	}
 
-	return &grid{width: w, height: h, cellSize: size, radiusSquared: r * r, cells: cells}
+	return &grid{width: w, height: h, cellSize: size, radius2: r * r, cells: cells}
 }
 
 func (g *grid) add(v field.Vector) bool {
 	cx, cy := g.cell(v)
 	w := g.cells[g.offset(cx, cy)]
 
-	if w != sentinel && v.Sub(w).NormSquared() < g.radiusSquared {
+	if w != sentinel && v.Sub(w).Norm2() < g.radius2 {
 		return false
 	}
 
@@ -47,7 +47,7 @@ func (g *grid) add(v field.Vector) bool {
 		for x := x0; x < x1; x++ {
 			w := g.cells[g.offset(x, y)]
 
-			if w != sentinel && v.Sub(w).NormSquared() < g.radiusSquared {
+			if w != sentinel && v.Sub(w).Norm2() < g.radius2 {
 				return false
 			}
 		}

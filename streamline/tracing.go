@@ -57,7 +57,7 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
 	}
 
 	var majorLines, minorLines []Streamline
-	dSepSq := t.dSep * t.dSep
+	dSep2 := t.dSep * t.dSep
 
 	pq := make(PriorityQueue, len(seeds))
 	for i, seed := range seeds {
@@ -72,14 +72,14 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
 
 	for pq.Len() > 0 {
 		curr := heap.Pop(&pq).(Item)
-		if !curr.self.grid.IsInBounds(curr.p) || curr.self.grid.IsTooClose(curr.p, dSepSq) {
+		if !curr.self.grid.IsInBounds(curr.p) || curr.self.grid.IsTooClose(curr.p, dSep2) {
 			continue
 		}
 
 		line := t.traceStreamline(curr)
 		*curr.self.lines = append(*curr.self.lines, line)
 
-		nextSeeds := findSeeds(line, dSepSq)
+		nextSeeds := findSeeds(line, dSep2)
 		for _, next := range nextSeeds {
 			heap.Push(&pq, Item{
 				p:        next,
@@ -93,12 +93,12 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
 	return Trace{Major: majorLines, Minor: minorLines}
 }
 
-func findSeeds(line Streamline, dSepSq float64) []field.Vector {
+func findSeeds(line Streamline, dSep2 float64) []field.Vector {
 	var seeds []field.Vector
 	prev := line.seed
 
 	for _, p := range line.front {
-		if p.Sub(prev).NormSquared() >= dSepSq {
+		if p.Sub(prev).Norm2() >= dSep2 {
 			seeds = append(seeds, p)
 			prev = p
 		}
@@ -106,7 +106,7 @@ func findSeeds(line Streamline, dSepSq float64) []field.Vector {
 
 	prev = line.seed
 	for _, p := range line.back {
-		if p.Sub(prev).NormSquared() >= dSepSq {
+		if p.Sub(prev).Norm2() >= dSep2 {
 			seeds = append(seeds, p)
 			prev = p
 		}
@@ -136,7 +136,7 @@ func (t Tracer) traceStreamline(item Item) Streamline {
 func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 	var halfline []field.Vector
 	dist := 0.0
-	dTestSq := t.dTest * t.dTest
+	dTest2 := t.dTest * t.dTest
 	curr := item.p
 
 	for {
@@ -149,12 +149,12 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 		}
 
 		// Stopping criteria (2): degenerate point.
-		if t.tf.Evaluate(curr).NormSquared() < field.Eps {
+		if t.tf.Evaluate(curr).Norm2() < field.Eps {
 			break
 		}
 
 		// Stopping criteria (3): loop.
-		if dist > t.dTest && curr.Sub(item.p).NormSquared() < dTestSq {
+		if dist > t.dTest && curr.Sub(item.p).Norm2() < dTest2 {
 			break
 		}
 
@@ -167,7 +167,7 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 		}
 
 		// Stopping criteria (5): too close to an existing streamline.
-		if item.self.grid.IsTooClose(curr, dTestSq) {
+		if item.self.grid.IsTooClose(curr, dTest2) {
 			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
 				halfline = append(halfline, lookahead)
 			}
@@ -188,7 +188,7 @@ func (t Tracer) step(dir, curr field.Vector, sel field.EigenSelector) (field.Vec
 
 func (t Tracer) lookahead(grid *Grid, dir, curr field.Vector, sel field.EigenSelector) (field.Vector, bool) {
 	dist := 0.0
-	dTestSq := t.dTest * t.dTest
+	dTest2 := t.dTest * t.dTest
 
 	for dist < t.dLookahead {
 		dir, curr = t.step(dir, curr, sel)
@@ -198,7 +198,7 @@ func (t Tracer) lookahead(grid *Grid, dir, curr field.Vector, sel field.EigenSel
 			break
 		}
 
-		if grid.IsTooClose(curr, dTestSq) {
+		if grid.IsTooClose(curr, dTest2) {
 			return curr, true
 		}
 	}

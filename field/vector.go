@@ -33,10 +33,10 @@ func (v Vector) normalized() Vector {
 	return v.Mul(1.0 / norm)
 }
 
-func (v Vector) NormSquared() float64 {
+func (v Vector) Norm2() float64 {
 	return v.Dot(v)
 }
 
 func (v Vector) Norm() float64 {
-	return math.Sqrt(v.NormSquared())
+	return math.Sqrt(v.Norm2())
 }

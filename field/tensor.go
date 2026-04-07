@@ -24,12 +24,12 @@ func (t Tensor) mul(alpha float64) Tensor {
 	return Tensor{alpha * t.a, alpha * t.b}
 }
 
-func (t Tensor) NormSquared() float64 {
+func (t Tensor) Norm2() float64 {
 	return t.a*t.a + t.b*t.b
 }
 
 func (t Tensor) MajorEigenvector() Vector {
-	norm := math.Sqrt(t.NormSquared())
+	norm := math.Sqrt(t.Norm2())
 	if norm < Eps {
 		return Vector{1.0, 0.0}
 	}
