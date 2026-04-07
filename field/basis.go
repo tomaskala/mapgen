@@ -19,7 +19,7 @@ type BasisField struct {
 func Grid(center, direction Vector, radius float64) BasisField {
 	l := direction.Norm()
 	theta := math.Atan2(direction.Y, direction.X)
-	baseTensor := GridTensor(l, theta)
+	baseTensor := gridTensor(l, theta)
 	return BasisField{
 		typ:        BasisGrid,
 		center:     center,
@@ -36,14 +36,14 @@ func Radial(center Vector, radius float64) BasisField {
 	}
 }
 
-func (bf BasisField) Evaluate(p Vector) Tensor {
+func (bf BasisField) evaluate(p Vector) Tensor {
 	switch bf.typ {
 	case BasisGrid:
 		// A grid is spatially constant.
 		return bf.baseTensor
 	case BasisRadial:
 		u := p.Sub(bf.center)
-		return RadialTensor(u)
+		return radialTensor(u)
 	default:
 		panic("unrecognized basis field type")
 	}

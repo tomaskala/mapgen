@@ -25,7 +25,7 @@ func (v Vector) Dot(w Vector) float64 {
 	return v.X*w.X + v.Y*w.Y
 }
 
-func (v Vector) Normalized() Vector {
+func (v Vector) normalized() Vector {
 	norm := v.Norm()
 	if norm < Eps {
 		return Vector{}

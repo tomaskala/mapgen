@@ -10,7 +10,7 @@ func (tf TensorField) Evaluate(p Vector) Tensor {
 	for _, f := range tf {
 		dp := p.Sub(f.center)
 		coef := math.Exp(-f.decay * dp.NormSquared())
-		t = t.Add(f.Evaluate(p).Mul(coef))
+		t = t.add(f.evaluate(p).mul(coef))
 	}
 
 	return t
