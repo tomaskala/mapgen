@@ -178,9 +178,9 @@ func run() int {
 	dc := gg.NewContext(width, height)
 
 	// Draw thicker in black first for the borders.
-	renderer.RenderGraph(dc, mainGraph)
+	renderer.RenderGraph(dc, minorGraph)
 	dc.SetHexColor("#000000")
-	dc.SetLineWidth(8)
+	dc.SetLineWidth(4)
 	dc.Stroke()
 
 	renderer.RenderGraph(dc, majorGraph)
@@ -188,15 +188,15 @@ func run() int {
 	dc.SetLineWidth(6)
 	dc.Stroke()
 
-	renderer.RenderGraph(dc, minorGraph)
+	renderer.RenderGraph(dc, mainGraph)
 	dc.SetHexColor("#000000")
-	dc.SetLineWidth(4)
+	dc.SetLineWidth(8)
 	dc.Stroke()
 
 	// Draw thinner in colors for the fill.
-	renderer.RenderGraph(dc, mainGraph)
-	dc.SetHexColor("#fff600")
-	dc.SetLineWidth(6)
+	renderer.RenderGraph(dc, minorGraph)
+	dc.SetHexColor("#dcdcdc")
+	dc.SetLineWidth(2)
 	dc.Stroke()
 
 	renderer.RenderGraph(dc, majorGraph)
@@ -204,9 +204,9 @@ func run() int {
 	dc.SetLineWidth(4)
 	dc.Stroke()
 
-	renderer.RenderGraph(dc, minorGraph)
-	dc.SetHexColor("#dcdcdc")
-	dc.SetLineWidth(2)
+	renderer.RenderGraph(dc, mainGraph)
+	dc.SetHexColor("#fff600")
+	dc.SetLineWidth(6)
 	dc.Stroke()
 
 	if err := dc.SavePNG(output); err != nil {
