@@ -38,7 +38,7 @@ type config struct {
 }
 
 var mainRoadCfg = config{
-	numSeeds:   300,
+	numSeeds:   30,
 	dSep:       200.0,
 	dTest:      100.0,
 	dLookahead: 300.0,
@@ -47,7 +47,7 @@ var mainRoadCfg = config{
 }
 
 var majorRoadCfg = config{
-	numSeeds:   300,
+	numSeeds:   30,
 	dSep:       100.0,
 	dTest:      30.0,
 	dLookahead: 200.0,
@@ -56,7 +56,7 @@ var majorRoadCfg = config{
 }
 
 var minorRoadCfg = config{
-	numSeeds:   300,
+	numSeeds:   30,
 	dSep:       20.0,
 	dTest:      15.0,
 	dLookahead: 40.0,

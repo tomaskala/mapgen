@@ -74,8 +74,8 @@ func (t Tracer) Trace(majorGrid, minorGrid *Grid, seeds []field.Vector) ([]Strea
 		line := t.traceStreamline(curr)
 		*curr.self.lines = append(*curr.self.lines, line)
 
-		next, found := findNextSeed(line, dSepSq)
-		if found {
+		nextSeeds := findSeeds(line, dSepSq)
+		for _, next := range nextSeeds {
 			heap.Push(&pq, Item{
 				p:        next,
 				self:     curr.other,
@@ -88,32 +88,26 @@ func (t Tracer) Trace(majorGrid, minorGrid *Grid, seeds []field.Vector) ([]Strea
 	return majorLines, minorLines
 }
 
-func findNextSeed(line Streamline, dSepSq float64) (field.Vector, bool) {
-	forward, forwardFound := findFirstBeyond(line.seed, line.front, dSepSq)
-	backward, backwardFound := findFirstBeyond(line.seed, line.back, dSepSq)
+func findSeeds(line Streamline, dSepSq float64) []field.Vector {
+	var seeds []field.Vector
+	prev := line.seed
 
-	switch {
-	case forwardFound && backwardFound:
-		if line.seed.Sub(forward).NormSquared() < line.seed.Sub(backward).NormSquared() {
-			return forward, true
-		}
-		return backward, true
-	case forwardFound:
-		return forward, true
-	case backwardFound:
-		return backward, true
-	default:
-		return field.Vector{}, false
-	}
-}
-
-func findFirstBeyond(seed field.Vector, halfline []field.Vector, dSepSq float64) (field.Vector, bool) {
-	for _, p := range halfline {
-		if seed.Sub(p).NormSquared() >= dSepSq {
-			return p, true
+	for _, p := range line.front {
+		if p.Sub(prev).NormSquared() >= dSepSq {
+			seeds = append(seeds, p)
+			prev = p
 		}
 	}
-	return field.Vector{}, false
+
+	prev = line.seed
+	for _, p := range line.back {
+		if p.Sub(prev).NormSquared() >= dSepSq {
+			seeds = append(seeds, p)
+			prev = p
+		}
+	}
+
+	return seeds
 }
 
 func (t Tracer) traceStreamline(item Item) Streamline {
