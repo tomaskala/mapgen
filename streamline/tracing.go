@@ -28,7 +28,7 @@ func (s Streamline) Points() []field.Vector {
 
 type Tracer struct {
 	tf         field.TensorField
-	population field.Population
+	population field.Scalar
 	dSep       float64
 	dTest      float64
 	dLookahead float64
@@ -38,7 +38,7 @@ type Tracer struct {
 
 func NewTracer(
 	tf field.TensorField,
-	population field.Population,
+	population field.Scalar,
 	dSep, dTest, dLookahead, rkStep, maxLength float64,
 ) Tracer {
 	return Tracer{

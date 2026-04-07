@@ -68,7 +68,7 @@ var minorRoadCfg = config{
 	maxLength:  800.0,
 }
 
-func sampleTensorField(population field.Population, rng *rand.Rand) field.TensorField {
+func sampleTensorField(population field.Scalar, rng *rand.Rand) field.TensorField {
 	minPop := math.MaxFloat64
 	maxPop := -math.MaxFloat64
 
@@ -130,7 +130,7 @@ func sampleTensorField(population field.Population, rng *rand.Rand) field.Tensor
 
 func trace(
 	tf field.TensorField,
-	population field.Population,
+	population field.Scalar,
 	cfg config,
 	previous streamline.Trace,
 	rng *rand.Rand,
