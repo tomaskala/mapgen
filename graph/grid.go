@@ -32,6 +32,10 @@ func newGrid(width, height int, cellSize float64) *grid {
 }
 
 func (g *grid) add(s segment) {
+	if !g.isInBounds(s.a) || !g.isInBounds(s.b) {
+		return
+	}
+
 	if len(g.seen) == g.segmentID {
 		g.seen = append(g.seen, 0)
 	}
@@ -71,6 +75,10 @@ func (g *grid) add(s segment) {
 
 func (g *grid) neighbors(s segment) iter.Seq[segment] {
 	return func(yield func(segment) bool) {
+		if !g.isInBounds(s.a) || !g.isInBounds(s.b) {
+			return
+		}
+
 		g.queryCount++
 
 		x0, y0 := g.cell(s.a)
@@ -126,6 +134,17 @@ func (g *grid) iterateNeighborhood(x, y int, yield func(segment) bool) bool {
 	}
 
 	return true
+}
+
+func (g *grid) isInBounds(v field.Vector) bool {
+	if v.X < 0 || v.Y < 0 {
+		return false
+	}
+
+	cx := int(v.X / g.cellSize)
+	cy := int(v.Y / g.cellSize)
+
+	return cx >= 0 && cx < g.width && cy >= 0 && cy < g.height
 }
 
 func (g *grid) cell(v field.Vector) (int, int) {

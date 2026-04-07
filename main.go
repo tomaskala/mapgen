@@ -42,16 +42,16 @@ var mainRoadCfg = config{
 	dSep:       200.0,
 	dTest:      100.0,
 	dLookahead: 300.0,
-	rkStep:     10.0,
+	rkStep:     1.0,
 	maxLength:  1200.0,
 }
 
 var majorRoadCfg = config{
 	numSeeds:   30,
-	dSep:       100.0,
-	dTest:      30.0,
-	dLookahead: 200.0,
-	rkStep:     10.0,
+	dSep:       80.0,
+	dTest:      40.0,
+	dLookahead: 100.0,
+	rkStep:     1.0,
 	maxLength:  1000.0,
 }
 
@@ -103,21 +103,33 @@ func sampleTensorField(width, height int, r float64, rng *oldrand.Rand) field.Te
 	return tf
 }
 
-func buildGraph(width, height int, tf field.TensorField, cfg config, rng *rand.Rand) graph.Graph {
-	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
-	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
+func trace(
+	width, height int,
+	tf field.TensorField,
+	cfg config,
+	previous streamline.Trace,
+	rng *rand.Rand,
+) streamline.Trace {
 	seeds := make([]field.Vector, cfg.numSeeds)
-	for i := range cfg.numSeeds {
+	for i := range seeds {
 		seeds[i] = field.Vector{
 			X: rng.Float64() * float64(width),
 			Y: rng.Float64() * float64(height),
 		}
 	}
 
-	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
-	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
+	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	for _, major := range previous.Major {
+		majorGrid.AddAll(major.Points())
+	}
 
-	return graph.BuildGraph(width, height, cfg.dSep, majorLines, minorLines)
+	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	for _, minor := range previous.Minor {
+		minorGrid.AddAll(minor.Points())
+	}
+
+	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
+	return tracer.Run(majorGrid, minorGrid, seeds)
 }
 
 func debugGraph(output string, width, height int, tf field.TensorField, cfg config, rng *rand.Rand) int {
@@ -132,12 +144,12 @@ func debugGraph(output string, width, height int, tf field.TensorField, cfg conf
 	}
 
 	tracer := streamline.NewTracer(tf, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
-	majorLines, minorLines := tracer.Trace(majorGrid, minorGrid, seeds)
+	trace := tracer.Run(majorGrid, minorGrid, seeds)
 
-	g := graph.BuildGraph(width, height, cfg.dSep, majorLines, minorLines)
+	g := graph.BuildGraph(width, height, cfg.dSep, trace)
 
 	dc := gg.NewContext(width, height)
-	renderer.DebugGraph(dc, majorLines, minorLines, g)
+	renderer.DebugGraph(dc, trace, g)
 
 	if err := dc.SavePNG(output); err != nil {
 		return exitIOError
@@ -171,9 +183,20 @@ func run() int {
 
 	// debugGraph(output, width, height, tf, mainRoadCfg, rng)
 
-	mainGraph := buildGraph(width, height, tf, mainRoadCfg, rng)
-	majorGraph := buildGraph(width, height, tf, majorRoadCfg, rng)
-	minorGraph := buildGraph(width, height, tf, minorRoadCfg, rng)
+	var fullTrace streamline.Trace
+	mainStreamlines := trace(width, height, tf, mainRoadCfg, fullTrace, rng)
+
+	fullTrace.Major = append(fullTrace.Major, mainStreamlines.Major...)
+	fullTrace.Minor = append(fullTrace.Minor, mainStreamlines.Minor...)
+	majorStreamlines := trace(width, height, tf, majorRoadCfg, fullTrace, rng)
+
+	fullTrace.Major = append(fullTrace.Major, majorStreamlines.Major...)
+	fullTrace.Minor = append(fullTrace.Minor, majorStreamlines.Minor...)
+	minorStreamlines := trace(width, height, tf, minorRoadCfg, fullTrace, rng)
+
+	mainGraph := graph.BuildGraph(width, height, mainRoadCfg.dSep, mainStreamlines)
+	majorGraph := graph.BuildGraph(width, height, majorRoadCfg.dSep, majorStreamlines)
+	minorGraph := graph.BuildGraph(width, height, minorRoadCfg.dSep, minorStreamlines)
 
 	dc := gg.NewContext(width, height)
 

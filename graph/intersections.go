@@ -47,8 +47,8 @@ type Graph struct {
 	Edges    []Edge
 }
 
-func BuildGraph(width, height int, cellSize float64, major, minor []streamline.Streamline) Graph {
-	intersections := findIntersections(width, height, cellSize, major, minor)
+func BuildGraph(width, height int, cellSize float64, trace streamline.Trace) Graph {
+	intersections := findIntersections(width, height, cellSize, trace)
 
 	vertices := make([]Vertex, len(intersections))
 	for i, intersection := range intersections {
@@ -60,7 +60,7 @@ func BuildGraph(width, height int, cellSize float64, major, minor []streamline.S
 		edges,
 		extractEdges(
 			intersections,
-			major,
+			trace.Major,
 			func(i intersection) int { return i.majorLineID },
 			func(i intersection) int { return i.majorSegmentID },
 			func(i intersection) float64 { return i.majorLineOffset },
@@ -69,7 +69,7 @@ func BuildGraph(width, height int, cellSize float64, major, minor []streamline.S
 		edges,
 		extractEdges(
 			intersections,
-			minor,
+			trace.Minor,
 			func(i intersection) int { return i.minorLineID },
 			func(i intersection) int { return i.minorSegmentID },
 			func(i intersection) float64 { return i.minorLineOffset },
@@ -86,11 +86,11 @@ func BuildGraph(width, height int, cellSize float64, major, minor []streamline.S
 	}
 }
 
-func findIntersections(width, height int, cellSize float64, major, minor []streamline.Streamline) []intersection {
+func findIntersections(width, height int, cellSize float64, trace streamline.Trace) []intersection {
 	var intersections []intersection
 	grid := newGrid(width, height, cellSize)
 
-	for i, streamline := range minor {
+	for i, streamline := range trace.Minor {
 		points := streamline.Points()
 
 		for p := range len(points) - 1 {
@@ -98,7 +98,7 @@ func findIntersections(width, height int, cellSize float64, major, minor []strea
 		}
 	}
 
-	for i, streamline := range major {
+	for i, streamline := range trace.Major {
 		points := streamline.Points()
 
 		for p := range len(points) - 1 {

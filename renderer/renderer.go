@@ -19,9 +19,9 @@ func RenderGraph(dc *gg.Context, g graph.Graph) {
 	}
 }
 
-func DebugGraph(dc *gg.Context, majorLines, minorLines []streamline.Streamline, g graph.Graph) {
+func DebugGraph(dc *gg.Context, trace streamline.Trace, g graph.Graph) {
 	dc.SetHexColor("#FF0000")
-	for _, major := range majorLines {
+	for _, major := range trace.Major {
 		points := major.Points()
 		if len(points) == 0 {
 			continue
@@ -36,7 +36,7 @@ func DebugGraph(dc *gg.Context, majorLines, minorLines []streamline.Streamline, 
 	dc.Stroke()
 
 	dc.SetHexColor("#00FF00")
-	for _, minor := range minorLines {
+	for _, minor := range trace.Minor {
 		points := minor.Points()
 		if len(points) == 0 {
 			continue

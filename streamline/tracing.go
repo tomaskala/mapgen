@@ -45,7 +45,12 @@ func NewTracer(tf field.TensorField, dSep, dTest, dLookahead, rkStep, maxLength 
 	}
 }
 
-func (t Tracer) Trace(majorGrid, minorGrid *Grid, seeds []field.Vector) ([]Streamline, []Streamline) {
+type Trace struct {
+	Major []Streamline
+	Minor []Streamline
+}
+
+func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
 	priority := func(field.Vector) float64 {
 		// TODO: Calculate priority based on the paper.
 		return 0.0
@@ -85,7 +90,7 @@ func (t Tracer) Trace(majorGrid, minorGrid *Grid, seeds []field.Vector) ([]Strea
 		}
 	}
 
-	return majorLines, minorLines
+	return Trace{Major: majorLines, Minor: minorLines}
 }
 
 func findSeeds(line Streamline, dSepSq float64) []field.Vector {

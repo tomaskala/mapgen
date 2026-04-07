@@ -21,6 +21,10 @@ func NewGrid(width, height int, cellSize float64) *Grid {
 }
 
 func (g *Grid) Add(v field.Vector) {
+	if !g.IsInBounds(v) {
+		return
+	}
+
 	cx, cy := g.cell(v)
 	off := g.offset(cx, cy)
 	g.cells[off] = append(g.cells[off], v)
@@ -33,6 +37,10 @@ func (g *Grid) AddAll(vs []field.Vector) {
 }
 
 func (g *Grid) IsInBounds(v field.Vector) bool {
+	if v.X < 0 || v.Y < 0 {
+		return false
+	}
+
 	cx := int(v.X / g.cellSize)
 	cy := int(v.Y / g.cellSize)
 
@@ -40,6 +48,10 @@ func (g *Grid) IsInBounds(v field.Vector) bool {
 }
 
 func (g *Grid) IsTooClose(v field.Vector, minDistSq float64) bool {
+	if !g.IsInBounds(v) {
+		return false
+	}
+
 	cx, cy := g.cell(v)
 
 	for ny := cy - 1; ny <= cy+1; ny++ {
