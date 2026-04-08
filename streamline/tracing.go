@@ -5,16 +5,23 @@ import (
 	"math"
 
 	"tomaskala.com/mapgen/field"
+	"tomaskala.com/mapgen/vector"
+)
+
+const (
+	populationScale = 3.0
+
+	degenerateThreshold = 0.01
 )
 
 type Streamline struct {
-	seed  field.Vector
-	back  []field.Vector
-	front []field.Vector
+	seed  vector.Vec2
+	back  []vector.Vec2
+	front []vector.Vec2
 }
 
-func (s Streamline) Points() []field.Vector {
-	points := make([]field.Vector, len(s.back)+1+len(s.front))
+func (s Streamline) Points() []vector.Vec2 {
+	points := make([]vector.Vec2, len(s.back)+1+len(s.front))
 
 	for i, p := range s.back {
 		points[len(s.back)-1-i] = p
@@ -28,7 +35,7 @@ func (s Streamline) Points() []field.Vector {
 
 type Tracer struct {
 	tf         field.TensorField
-	population field.Scalar
+	population field.NoiseField
 	dSep       float64
 	dTest      float64
 	dLookahead float64
@@ -38,7 +45,7 @@ type Tracer struct {
 
 func NewTracer(
 	tf field.TensorField,
-	population field.Scalar,
+	population field.NoiseField,
 	dSep, dTest, dLookahead, rkStep, maxLength float64,
 ) Tracer {
 	return Tracer{
@@ -57,10 +64,9 @@ type Trace struct {
 	Minor []Streamline
 }
 
-func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
-	priority := func(v field.Vector) float64 {
-		pop := t.population.Density(v)
-		const populationScale = 3.0
+func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []vector.Vec2) Trace {
+	priority := func(v vector.Vec2) float64 {
+		pop := t.population.Evaluate(v)
 		return math.Exp(populationScale * pop)
 	}
 
@@ -101,8 +107,8 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []field.Vector) Trace {
 	return Trace{Major: majorLines, Minor: minorLines}
 }
 
-func findSeeds(line Streamline, dSep2 float64) []field.Vector {
-	var seeds []field.Vector
+func findSeeds(line Streamline, dSep2 float64) []vector.Vec2 {
+	var seeds []vector.Vec2
 	prev := line.seed
 
 	for _, p := range line.front {
@@ -124,7 +130,7 @@ func findSeeds(line Streamline, dSep2 float64) []field.Vector {
 }
 
 func (t Tracer) traceStreamline(item Item) Streamline {
-	forward := item.self.sel(t.tf.Evaluate(item.p))
+	forward := item.self.sel(t.tf.Evaluate(item.p)).Normalized()
 	backward := forward.Mul(-1.0)
 
 	back := t.traceHalfline(item, backward)
@@ -141,15 +147,15 @@ func (t Tracer) traceStreamline(item Item) Streamline {
 	}
 }
 
-func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
-	var halfline []field.Vector
+func (t Tracer) traceHalfline(item Item, dir vector.Vec2) []vector.Vec2 {
+	var halfline []vector.Vec2
 	dist := 0.0
 	dTest2 := t.dTest * t.dTest
 	curr := item.p
 
 	for {
 		next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, item.self.sel)
-		dir = next.Sub(curr)
+		dir = next.Sub(curr).Normalized()
 		dist += next.Dist(curr)
 		curr = next
 
@@ -159,7 +165,7 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 		}
 
 		// Stopping criteria (2): degenerate point.
-		if t.tf.Evaluate(curr).Norm2() < field.Eps {
+		if t.tf.Evaluate(curr).Norm2() < degenerateThreshold {
 			break
 		}
 
@@ -190,13 +196,13 @@ func (t Tracer) traceHalfline(item Item, dir field.Vector) []field.Vector {
 	return halfline
 }
 
-func (t Tracer) lookahead(grid *Grid, dir, curr field.Vector, sel field.EigenSelector) (field.Vector, bool) {
+func (t Tracer) lookahead(grid *Grid, dir, curr vector.Vec2, sel field.EigenSelector) (vector.Vec2, bool) {
 	dist := 0.0
 	dTest2 := t.dTest * t.dTest
 
 	for dist < t.dLookahead {
 		next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, sel)
-		dir = next.Sub(curr)
+		dir = next.Sub(curr).Normalized()
 		dist += next.Dist(curr)
 		curr = next
 
@@ -209,5 +215,5 @@ func (t Tracer) lookahead(grid *Grid, dir, curr field.Vector, sel field.EigenSel
 		}
 	}
 
-	return field.Vector{}, false
+	return vector.Vec2{}, false
 }

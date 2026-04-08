@@ -1,8 +1,10 @@
 package field
 
-type EigenSelector func(Tensor) Vector
+import "tomaskala.com/mapgen/vector"
 
-func RungeKuttaStep(tf TensorField, prev, curr Vector, step float64, sel EigenSelector) Vector {
+type EigenSelector func(Tensor) vector.Vec2
+
+func RungeKuttaStep(tf TensorField, prev, curr vector.Vec2, step float64, sel EigenSelector) vector.Vec2 {
 	k1 := rungeKuttaEvaluate(tf, prev, curr, sel)
 	k2 := rungeKuttaEvaluate(tf, k1, curr.Add(k1.Mul(step/2.0)), sel)
 	k3 := rungeKuttaEvaluate(tf, k2, curr.Add(k2.Mul(step/2.0)), sel)
@@ -11,7 +13,7 @@ func RungeKuttaStep(tf TensorField, prev, curr Vector, step float64, sel EigenSe
 	return curr.Add(k1.Add(k2.Mul(2.0)).Add(k3.Mul(2.0)).Add(k4).Mul(step / 6.0))
 }
 
-func rungeKuttaEvaluate(tf TensorField, prev, curr Vector, sel EigenSelector) Vector {
+func rungeKuttaEvaluate(tf TensorField, prev, curr vector.Vec2, sel EigenSelector) vector.Vec2 {
 	dir := sel(tf.Evaluate(curr))
 
 	if dir.Dot(prev) < 0.0 {

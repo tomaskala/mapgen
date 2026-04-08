@@ -1,6 +1,9 @@
 package streamline
 
-import "tomaskala.com/mapgen/field"
+import (
+	"tomaskala.com/mapgen/field"
+	"tomaskala.com/mapgen/vector"
+)
 
 type Family struct {
 	grid  *Grid
@@ -9,7 +12,7 @@ type Family struct {
 }
 
 type Item struct {
-	p        field.Vector
+	p        vector.Vec2
 	self     Family
 	other    Family
 	priority float64

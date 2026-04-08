@@ -5,12 +5,12 @@ import (
 	"math"
 	"slices"
 
-	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/streamline"
+	"tomaskala.com/mapgen/vector"
 )
 
 type intersection struct {
-	pos             field.Vector
+	pos             vector.Vec2
 	id              int
 	majorLineOffset float64
 	minorLineOffset float64
@@ -21,8 +21,8 @@ type intersection struct {
 }
 
 type segment struct {
-	a         field.Vector
-	b         field.Vector
+	a         vector.Vec2
+	b         vector.Vec2
 	lineID    int
 	segmentID int
 }
@@ -32,14 +32,14 @@ type VertexID int
 type EdgeID int
 
 type Vertex struct {
-	Pos   field.Vector
+	Pos   vector.Vec2
 	Edges []EdgeID
 }
 
 type Edge struct {
 	A    VertexID
 	B    VertexID
-	Path []field.Vector
+	Path []vector.Vec2
 }
 
 type Graph struct {
@@ -162,7 +162,7 @@ func extractEdges(
 
 		points := streamlines[g].Points()
 		for i := range len(group) - 1 {
-			var path []field.Vector
+			var path []vector.Vec2
 
 			startSeg := segmentIDSelector(group[i])
 			endSeg := segmentIDSelector(group[i+1])
@@ -185,7 +185,7 @@ func intersects(s1, s2 segment) (float64, float64, bool) {
 	r := s2.b.Sub(s2.a)
 
 	denom := q.Y*r.X - q.X*r.Y
-	if math.Abs(denom) < field.Eps*q.Norm()*r.Norm() {
+	if math.Abs(denom) < vector.Eps*q.Norm()*r.Norm() {
 		return 0.0, 0.0, false
 	}
 

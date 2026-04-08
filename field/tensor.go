@@ -1,6 +1,10 @@
 package field
 
-import "math"
+import (
+	"math"
+
+	"tomaskala.com/mapgen/vector"
+)
 
 // Tensor represents a traceless symmetrix 2x2 matrix of the form [a, b; b, -a].
 type Tensor struct {
@@ -12,7 +16,7 @@ func gridTensor(r, theta float64) Tensor {
 	return Tensor{r * math.Cos(2.0*theta), r * math.Sin(2.0*theta)}
 }
 
-func radialTensor(v Vector) Tensor {
+func radialTensor(v vector.Vec2) Tensor {
 	return Tensor{v.Y*v.Y - v.X*v.X, -2.0 * v.X * v.Y}
 }
 
@@ -28,20 +32,20 @@ func (t Tensor) Norm2() float64 {
 	return t.a*t.a + t.b*t.b
 }
 
-func (t Tensor) MajorEigenvector() Vector {
+func (t Tensor) MajorEigenvector() vector.Vec2 {
 	norm := math.Sqrt(t.Norm2())
-	if norm < Eps {
-		return Vector{1.0, 0.0}
+	if norm < vector.Eps {
+		return vector.Vec2{X: 1.0, Y: 0.0}
 	}
 
 	if t.a > 0 {
-		return Vector{norm + t.a, t.b}.normalized()
+		return vector.Vec2{X: norm + t.a, Y: t.b}.Normalized()
 	}
 
-	return Vector{t.b, norm - t.a}.normalized()
+	return vector.Vec2{X: t.b, Y: norm - t.a}.Normalized()
 }
 
-func (t Tensor) MinorEigenvector() Vector {
+func (t Tensor) MinorEigenvector() vector.Vec2 {
 	v := t.MajorEigenvector()
-	return Vector{-v.Y, v.X}
+	return vector.Vec2{X: -v.Y, Y: v.X}
 }

@@ -3,24 +3,24 @@ package streamline
 import (
 	"math"
 
-	"tomaskala.com/mapgen/field"
+	"tomaskala.com/mapgen/vector"
 )
 
 type Grid struct {
 	width    int
 	height   int
 	cellSize float64
-	cells    [][]field.Vector
+	cells    [][]vector.Vec2
 }
 
 func NewGrid(width, height int, cellSize float64) *Grid {
 	w := int(math.Ceil(float64(width) / cellSize))
 	h := int(math.Ceil(float64(height) / cellSize))
-	cells := make([][]field.Vector, w*h)
+	cells := make([][]vector.Vec2, w*h)
 	return &Grid{w, h, cellSize, cells}
 }
 
-func (g *Grid) Add(v field.Vector) {
+func (g *Grid) Add(v vector.Vec2) {
 	if !g.IsInBounds(v) {
 		return
 	}
@@ -30,13 +30,13 @@ func (g *Grid) Add(v field.Vector) {
 	g.cells[off] = append(g.cells[off], v)
 }
 
-func (g *Grid) AddAll(vs []field.Vector) {
+func (g *Grid) AddAll(vs []vector.Vec2) {
 	for _, v := range vs {
 		g.Add(v)
 	}
 }
 
-func (g *Grid) IsInBounds(v field.Vector) bool {
+func (g *Grid) IsInBounds(v vector.Vec2) bool {
 	if v.X < 0 || v.Y < 0 {
 		return false
 	}
@@ -47,7 +47,7 @@ func (g *Grid) IsInBounds(v field.Vector) bool {
 	return cx >= 0 && cx < g.width && cy >= 0 && cy < g.height
 }
 
-func (g *Grid) IsTooClose(v field.Vector, minDist2 float64) bool {
+func (g *Grid) IsTooClose(v vector.Vec2, minDist2 float64) bool {
 	if !g.IsInBounds(v) {
 		return false
 	}
@@ -71,7 +71,7 @@ func (g *Grid) IsTooClose(v field.Vector, minDist2 float64) bool {
 	return false
 }
 
-func (g *Grid) cell(v field.Vector) (int, int) {
+func (g *Grid) cell(v vector.Vec2) (int, int) {
 	cx := int(v.X / g.cellSize)
 	cy := int(v.Y / g.cellSize)
 	return cx, cy

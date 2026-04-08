@@ -4,7 +4,7 @@ import (
 	"iter"
 	"math"
 
-	"tomaskala.com/mapgen/field"
+	"tomaskala.com/mapgen/vector"
 )
 
 type queryCount int
@@ -136,7 +136,7 @@ func (g *grid) iterateNeighborhood(x, y int, yield func(segment) bool) bool {
 	return true
 }
 
-func (g *grid) isInBounds(v field.Vector) bool {
+func (g *grid) isInBounds(v vector.Vec2) bool {
 	if v.X < 0 || v.Y < 0 {
 		return false
 	}
@@ -147,7 +147,7 @@ func (g *grid) isInBounds(v field.Vector) bool {
 	return cx >= 0 && cx < g.width && cy >= 0 && cy < g.height
 }
 
-func (g *grid) cell(v field.Vector) (int, int) {
+func (g *grid) cell(v vector.Vec2) (int, int) {
 	cx := int(v.X / g.cellSize)
 	cy := int(v.Y / g.cellSize)
 	return cx, cy
