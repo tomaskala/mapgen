@@ -21,7 +21,7 @@ const (
 	maxGrid = 4
 
 	minRadial = 1
-	maxRadial = 2
+	maxRadial = 3
 )
 
 func buildCityMap(width, height int, rng *rand.Rand) city.City {

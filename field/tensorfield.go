@@ -11,9 +11,9 @@ type TensorField []BasisField
 func (tf TensorField) Evaluate(p vector.Vec2) Tensor {
 	t := Tensor{}
 
-	for _, f := range tf {
-		coef := math.Exp(-f.decay * p.Dist2(f.center))
-		t = t.add(f.evaluate(p).mul(coef))
+	for _, bf := range tf {
+		coef := bf.weight(p)
+		t = t.add(bf.evaluate(p).mul(coef))
 	}
 
 	return t
@@ -61,6 +61,21 @@ func (bf BasisField) evaluate(p vector.Vec2) Tensor {
 	case BasisRadial:
 		u := p.Sub(bf.center)
 		return radialTensor(u)
+	default:
+		panic("unrecognized basis field type")
+	}
+}
+
+func (bf BasisField) weight(p vector.Vec2) float64 {
+	switch bf.typ {
+	case BasisGrid:
+		return math.Exp(-bf.decay * p.Dist2(bf.center))
+	case BasisRadial:
+		t := p.Dist2(bf.center) * bf.decay
+		if t >= 1.0 {
+			return 0.0
+		}
+		return (1.0 - t) * (1.0 - t)
 	default:
 		panic("unrecognized basis field type")
 	}
