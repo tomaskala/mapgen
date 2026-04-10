@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"math"
 
+	"tomaskala.com/mapgen/config"
 	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/vector"
 )
@@ -12,6 +13,7 @@ const (
 	populationScale = 3.0
 
 	degenerateThreshold = 0.01
+	localDensityDamping = 0.2
 )
 
 type Streamline struct {
@@ -36,27 +38,11 @@ func (s Streamline) Points() []vector.Vec2 {
 type Tracer struct {
 	tf         field.TensorField
 	population field.NoiseField
-	dSep       float64
-	dTest      float64
-	dLookahead float64
-	rkStep     float64
-	maxLength  float64
+	cfg        config.Config
 }
 
-func NewTracer(
-	tf field.TensorField,
-	population field.NoiseField,
-	dSep, dTest, dLookahead, rkStep, maxLength float64,
-) Tracer {
-	return Tracer{
-		tf:         tf,
-		population: population,
-		dSep:       dSep,
-		dTest:      dTest,
-		dLookahead: dLookahead,
-		rkStep:     rkStep,
-		maxLength:  maxLength,
-	}
+func NewTracer(tf field.TensorField, population field.NoiseField, cfg config.Config) Tracer {
+	return Tracer{tf: tf, population: population, cfg: cfg}
 }
 
 type Trace struct {
@@ -71,7 +57,6 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []vector.Vec2) Trace {
 	}
 
 	var majorLines, minorLines []Streamline
-	dSep2 := t.dSep * t.dSep
 
 	pq := make(PriorityQueue, len(seeds))
 	for i, seed := range seeds {
@@ -86,14 +71,15 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []vector.Vec2) Trace {
 
 	for pq.Len() > 0 {
 		curr := heap.Pop(&pq).(Item)
-		if !curr.self.grid.IsInBounds(curr.p) || curr.self.grid.IsTooClose(curr.p, dSep2) {
+		dSep := t.dSep(curr.p)
+		if !curr.self.grid.IsInBounds(curr.p) || curr.self.grid.IsTooClose(curr.p, dSep*dSep) {
 			continue
 		}
 
 		line := t.traceStreamline(curr)
 		*curr.self.lines = append(*curr.self.lines, line)
 
-		nextSeeds := findSeeds(line, dSep2)
+		nextSeeds := t.findSeeds(line)
 		for _, next := range nextSeeds {
 			heap.Push(&pq, Item{
 				p:        next,
@@ -107,12 +93,13 @@ func (t Tracer) Run(majorGrid, minorGrid *Grid, seeds []vector.Vec2) Trace {
 	return Trace{Major: majorLines, Minor: minorLines}
 }
 
-func findSeeds(line Streamline, dSep2 float64) []vector.Vec2 {
+func (t Tracer) findSeeds(line Streamline) []vector.Vec2 {
 	var seeds []vector.Vec2
 	prev := line.seed
 
 	for _, p := range line.front {
-		if p.Dist2(prev) >= dSep2 {
+		dSep := t.dSep(p)
+		if p.Dist2(prev) >= dSep*dSep {
 			seeds = append(seeds, p)
 			prev = p
 		}
@@ -120,7 +107,8 @@ func findSeeds(line Streamline, dSep2 float64) []vector.Vec2 {
 
 	prev = line.seed
 	for _, p := range line.back {
-		if p.Dist2(prev) >= dSep2 {
+		dSep := t.dSep(p)
+		if p.Dist2(prev) >= dSep*dSep {
 			seeds = append(seeds, p)
 			prev = p
 		}
@@ -150,14 +138,14 @@ func (t Tracer) traceStreamline(item Item) Streamline {
 func (t Tracer) traceHalfline(item Item, dir vector.Vec2) []vector.Vec2 {
 	var halfline []vector.Vec2
 	dist := 0.0
-	dTest2 := t.dTest * t.dTest
 	curr := item.p
 
 	for {
-		next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, item.self.sel)
+		next := field.RungeKuttaStep(t.tf, dir, curr, t.cfg.RkStep, item.self.sel)
 		dir = next.Sub(curr).Normalized()
 		dist += next.Dist(curr)
 		curr = next
+		dTest := t.dTest(curr)
 
 		// Stopping criteria (1): out of domain boundary.
 		if !item.self.grid.IsInBounds(curr) {
@@ -170,12 +158,12 @@ func (t Tracer) traceHalfline(item Item, dir vector.Vec2) []vector.Vec2 {
 		}
 
 		// Stopping criteria (3): loop.
-		if dist > t.dTest && curr.Dist2(item.p) < dTest2 {
+		if dist > dTest && curr.Dist2(item.p) < dTest*dTest {
 			break
 		}
 
 		// Stopping criteria (4): length exceeded.
-		if dist > t.maxLength {
+		if dist > t.cfg.MaxLength {
 			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
 				halfline = append(halfline, lookahead)
 			}
@@ -183,7 +171,7 @@ func (t Tracer) traceHalfline(item Item, dir vector.Vec2) []vector.Vec2 {
 		}
 
 		// Stopping criteria (5): too close to an existing streamline.
-		if item.self.grid.IsTooClose(curr, dTest2) {
+		if item.self.grid.IsTooClose(curr, dTest*dTest) {
 			if lookahead, found := t.lookahead(item.other.grid, dir, curr, item.self.sel); found {
 				halfline = append(halfline, lookahead)
 			}
@@ -198,22 +186,51 @@ func (t Tracer) traceHalfline(item Item, dir vector.Vec2) []vector.Vec2 {
 
 func (t Tracer) lookahead(grid *Grid, dir, curr vector.Vec2, sel field.EigenSelector) (vector.Vec2, bool) {
 	dist := 0.0
-	dTest2 := t.dTest * t.dTest
+	dLookahead := t.dLookahead(curr)
 
-	for dist < t.dLookahead {
-		next := field.RungeKuttaStep(t.tf, dir, curr, t.rkStep, sel)
+	for dist < dLookahead {
+		next := field.RungeKuttaStep(t.tf, dir, curr, t.cfg.RkStep, sel)
 		dir = next.Sub(curr).Normalized()
 		dist += next.Dist(curr)
 		curr = next
+		dTest := t.dTest(curr)
+		dLookahead = t.dLookahead(curr)
 
 		if !grid.IsInBounds(curr) {
 			break
 		}
 
-		if grid.IsTooClose(curr, dTest2) {
+		if grid.IsTooClose(curr, dTest*dTest) {
 			return curr, true
 		}
 	}
 
 	return vector.Vec2{}, false
+}
+
+func (t Tracer) dSep(v vector.Vec2) float64 {
+	if t.cfg.ConstDensity {
+		return t.cfg.DSep
+	}
+
+	population := t.population.Evaluate(v)
+	return t.cfg.DSep / (population + localDensityDamping)
+}
+
+func (t Tracer) dTest(v vector.Vec2) float64 {
+	if t.cfg.ConstDensity {
+		return t.cfg.DTest
+	}
+
+	population := t.population.Evaluate(v)
+	return t.cfg.DTest / (population + localDensityDamping)
+}
+
+func (t Tracer) dLookahead(v vector.Vec2) float64 {
+	if t.cfg.ConstDensity {
+		return t.cfg.DLookahead
+	}
+
+	population := t.population.Evaluate(v)
+	return t.cfg.DLookahead / (population + localDensityDamping)
 }

@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 
 	"tomaskala.com/mapgen/city"
+	"tomaskala.com/mapgen/config"
 	"tomaskala.com/mapgen/field"
 	"tomaskala.com/mapgen/graph"
 	"tomaskala.com/mapgen/streamline"
@@ -24,6 +25,38 @@ const (
 	maxRadial = 3
 )
 
+var (
+	mainRoadCfg = config.Config{
+		NumSeeds:     30,
+		ConstDensity: true,
+		DSep:         200.0,
+		DTest:        100.0,
+		DLookahead:   300.0,
+		RkStep:       1.0,
+		MaxLength:    1200.0,
+	}
+
+	majorRoadCfg = config.Config{
+		NumSeeds:     30,
+		ConstDensity: true,
+		DSep:         80.0,
+		DTest:        40.0,
+		DLookahead:   100.0,
+		RkStep:       1.0,
+		MaxLength:    1000.0,
+	}
+
+	minorRoadCfg = config.Config{
+		NumSeeds:     30,
+		ConstDensity: false,
+		DSep:         20.0,
+		DTest:        15.0,
+		DLookahead:   40.0,
+		RkStep:       1.0,
+		MaxLength:    800.0,
+	}
+)
+
 func buildCityMap(width, height int, rng *rand.Rand) city.City {
 	population := field.Noise(initialPopScale, initialPopOctaves, rng.Int64())
 	tf := initializeTensorField(width, height, population, rng)
@@ -39,9 +72,9 @@ func buildCityMap(width, height int, rng *rand.Rand) city.City {
 	fullTrace.Minor = append(fullTrace.Minor, majorStreamlines.Minor...)
 	minorStreamlines := traceStreamlines(width, height, tf, population, fullTrace, minorRoadCfg, rng)
 
-	mainGraph := graph.BuildGraph(width, height, mainRoadCfg.dSep, mainStreamlines)
-	majorGraph := graph.BuildGraph(width, height, majorRoadCfg.dSep, majorStreamlines)
-	minorGraph := graph.BuildGraph(width, height, minorRoadCfg.dSep, minorStreamlines)
+	mainGraph := graph.BuildGraph(width, height, mainRoadCfg.DSep, mainStreamlines)
+	majorGraph := graph.BuildGraph(width, height, majorRoadCfg.DSep, majorStreamlines)
+	minorGraph := graph.BuildGraph(width, height, minorRoadCfg.DSep, minorStreamlines)
 
 	return city.City{MainRoads: mainGraph, MajorRoads: majorGraph, MinorRoads: minorGraph}
 }
@@ -51,10 +84,10 @@ func traceStreamlines(
 	tf field.TensorField,
 	population field.NoiseField,
 	previous streamline.Trace,
-	cfg config,
+	cfg config.Config,
 	rng *rand.Rand,
 ) streamline.Trace {
-	seeds := make([]vector.Vec2, cfg.numSeeds)
+	seeds := make([]vector.Vec2, cfg.NumSeeds)
 	for i := range seeds {
 		seeds[i] = vector.Vec2{
 			X: rng.Float64() * float64(width),
@@ -62,17 +95,17 @@ func traceStreamlines(
 		}
 	}
 
-	majorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	majorGrid := streamline.NewGrid(width, height, cfg.DSep)
 	for _, major := range previous.Major {
 		majorGrid.AddAll(major.Points())
 	}
 
-	minorGrid := streamline.NewGrid(width, height, cfg.dSep)
+	minorGrid := streamline.NewGrid(width, height, cfg.DSep)
 	for _, minor := range previous.Minor {
 		minorGrid.AddAll(minor.Points())
 	}
 
-	tracer := streamline.NewTracer(tf, population, cfg.dSep, cfg.dTest, cfg.dLookahead, cfg.rkStep, cfg.maxLength)
+	tracer := streamline.NewTracer(tf, population, cfg)
 	return tracer.Run(majorGrid, minorGrid, seeds)
 }
 
