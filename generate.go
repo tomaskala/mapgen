@@ -23,8 +23,11 @@ const (
 	minGrid = 2
 	maxGrid = 4
 
-	minRadial = 1
-	maxRadial = 3
+	minRadialLarge = 1
+	maxRadialLarge = 3
+
+	minRadialSmall = 10
+	maxRadialSmall = 15
 )
 
 var (
@@ -111,25 +114,39 @@ func traceStreamlines(
 	return tracer.Run(majorGrid, minorGrid, seeds)
 }
 
+func randRange(a, b float64, rng *rand.Rand) float64 {
+	return a + (b-a)*rng.Float64()
+}
+
+func randIntRange(a, b int, rng *rand.Rand) int {
+	return a + rng.IntN(b-a+1)
+}
+
 func initializeTensorField(width, height int, population field.NoiseField, rng *rand.Rand) field.TensorField {
 	candidates := samplePopulationCenters(width, height, population, rng)
 
 	makeGrid := func(p vector.Vec2) field.BasisField {
 		theta := rng.Float64() * math.Pi
 		dir := vector.Vec2{X: math.Cos(theta), Y: math.Sin(theta)}
-		radius := (0.2 + 0.3*rng.Float64()) * float64(width)
+		radius := randRange(0.2, 0.5, rng) * float64(width)
 		return field.Grid(p, dir, radius)
 	}
 
-	makeRadial := func(p vector.Vec2) field.BasisField {
-		radius := (0.1 + 0.15*rng.Float64()) * float64(width)
+	makeRadialLarge := func(p vector.Vec2) field.BasisField {
+		radius := randRange(0.1, 0.25, rng) * float64(width)
 		return field.Radial(p, radius)
 	}
 
-	numGrid := minGrid + rng.IntN(maxGrid-minGrid+1)
-	numRadial := minRadial + rng.IntN(maxRadial-minRadial+1)
+	makeRadialSmall := func(p vector.Vec2) field.BasisField {
+		radius := randRange(25.0, 50.0, rng)
+		return field.Radial(p, radius)
+	}
 
-	if len(candidates) < numGrid+numRadial {
+	numGrid := randIntRange(minGrid, maxGrid, rng)
+	numRadialLarge := randIntRange(minRadialLarge, maxRadialLarge, rng)
+	numRadialSmall := randIntRange(minRadialSmall, maxRadialSmall, rng)
+
+	if len(candidates) < numGrid+numRadialLarge {
 		panic("not enough candidate points for sampling tensor fields")
 	}
 
@@ -143,10 +160,18 @@ func initializeTensorField(width, height int, population field.NoiseField, rng *
 	}
 
 	for i, p := range candidates[numGrid:] {
-		if i == numRadial {
+		if i == numRadialLarge {
 			break
 		}
-		tf = append(tf, makeRadial(p))
+		tf = append(tf, makeRadialLarge(p))
+	}
+
+	for i := range numRadialSmall {
+		if i == numRadialSmall {
+			break
+		}
+		p := vector.Vec2{X: rng.Float64() * float64(width), Y: rng.Float64() * float64(height)}
+		tf = append(tf, makeRadialSmall(p))
 	}
 
 	globalGridCenter := vector.Vec2{X: float64(width) / 2.0, Y: float64(height) / 2.0}
