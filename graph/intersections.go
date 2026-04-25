@@ -2,6 +2,7 @@ package graph
 
 import (
 	"cmp"
+	"iter"
 	"math"
 	"slices"
 
@@ -29,61 +30,80 @@ type segment struct {
 
 type VertexID int
 
-type EdgeID int
-
 type Vertex struct {
-	Pos   vector.Vec2
-	Edges []EdgeID
+	ID  VertexID
+	Pos vector.Vec2
 }
 
 type Edge struct {
-	A    VertexID
-	B    VertexID
-	Path []vector.Vec2
+	To       VertexID
+	path     []vector.Vec2
+	backward bool
+}
+
+func (e Edge) Path() iter.Seq[vector.Vec2] {
+	if e.backward {
+		return func(yield func(vector.Vec2) bool) {
+			for _, v := range slices.Backward(e.path) {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+	}
+
+	return func(yield func(vector.Vec2) bool) {
+		for _, v := range e.path {
+			if !yield(v) {
+				return
+			}
+		}
+	}
 }
 
 type Graph struct {
-	Vertices []Vertex
-	Edges    []Edge
+	Vertices  []Vertex
+	Adjacency [][]Edge
 }
 
-func BuildGraph(width, height int, cellSize float64, trace streamline.Trace) Graph {
+func (g *Graph) addVertex(pos vector.Vec2) {
+	id := VertexID(len(g.Vertices))
+	g.Vertices = append(g.Vertices, Vertex{id, pos})
+	g.Adjacency = append(g.Adjacency, nil)
+}
+
+func (g *Graph) addEdge(from, to VertexID, path []vector.Vec2) {
+	g.Adjacency[from] = append(g.Adjacency[from], Edge{To: to, path: path, backward: false})
+	g.Adjacency[to] = append(g.Adjacency[to], Edge{To: from, path: path, backward: true})
+}
+
+func BuildGraph(width, height int, cellSize float64, trace streamline.Trace) *Graph {
+	g := &Graph{}
 	intersections := findIntersections(width, height, cellSize, trace)
 
-	vertices := make([]Vertex, len(intersections))
-	for i, intersection := range intersections {
-		vertices[i] = Vertex{Pos: intersection.pos}
+	for _, intersection := range intersections {
+		g.addVertex(intersection.pos)
 	}
 
-	var edges []Edge
-	edges = append(
-		edges,
-		extractEdges(
-			intersections,
-			trace.Major,
-			func(i intersection) int { return i.majorLineID },
-			func(i intersection) int { return i.majorSegmentID },
-			func(i intersection) float64 { return i.majorLineOffset },
-		)...)
-	edges = append(
-		edges,
-		extractEdges(
-			intersections,
-			trace.Minor,
-			func(i intersection) int { return i.minorLineID },
-			func(i intersection) int { return i.minorSegmentID },
-			func(i intersection) float64 { return i.minorLineOffset },
-		)...)
+	extractEdges(
+		g,
+		intersections,
+		trace.Major,
+		func(i intersection) int { return i.majorLineID },
+		func(i intersection) int { return i.majorSegmentID },
+		func(i intersection) float64 { return i.majorLineOffset },
+	)
 
-	for id, edge := range edges {
-		vertices[edge.A].Edges = append(vertices[edge.A].Edges, EdgeID(id))
-		vertices[edge.B].Edges = append(vertices[edge.B].Edges, EdgeID(id))
-	}
+	extractEdges(
+		g,
+		intersections,
+		trace.Minor,
+		func(i intersection) int { return i.minorLineID },
+		func(i intersection) int { return i.minorSegmentID },
+		func(i intersection) float64 { return i.minorLineOffset },
+	)
 
-	return Graph{
-		Vertices: vertices,
-		Edges:    edges,
-	}
+	return g
 }
 
 func findIntersections(width, height int, cellSize float64, trace streamline.Trace) []intersection {
@@ -135,12 +155,12 @@ type idSelector func(intersection) int
 type offsetSelector func(intersection) float64
 
 func extractEdges(
+	g *Graph,
 	intersections []intersection,
 	streamlines []streamline.Streamline,
 	lineIDSelector, segmentIDSelector idSelector,
 	lineOffsetSelector offsetSelector,
-) []Edge {
-	var edges []Edge
+) {
 	groups := make([][]intersection, len(streamlines))
 
 	for _, intersection := range intersections {
@@ -148,7 +168,7 @@ func extractEdges(
 		groups[id] = append(groups[id], intersection)
 	}
 
-	for g, group := range groups {
+	for gID, group := range groups {
 		slices.SortFunc(group, func(i1, i2 intersection) int {
 			seg1 := segmentIDSelector(i1)
 			seg2 := segmentIDSelector(i2)
@@ -160,7 +180,7 @@ func extractEdges(
 			return cmp.Compare(lineOffsetSelector(i1), lineOffsetSelector(i2))
 		})
 
-		points := streamlines[g].Points()
+		points := streamlines[gID].Points()
 		for i := range len(group) - 1 {
 			var path []vector.Vec2
 
@@ -173,11 +193,9 @@ func extractEdges(
 			}
 			path = append(path, group[i+1].pos)
 
-			edges = append(edges, Edge{A: VertexID(group[i].id), B: VertexID(group[i+1].id), Path: path})
+			g.addEdge(VertexID(group[i].id), VertexID(group[i+1].id), path)
 		}
 	}
-
-	return edges
 }
 
 func intersects(s1, s2 segment) (float64, float64, bool) {

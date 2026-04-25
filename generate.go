@@ -81,7 +81,9 @@ func buildCityMap(width, height int, rng *rand.Rand) city.City {
 	majorGraph := graph.BuildGraph(width, height, majorRoadCfg.DSep, majorStreamlines)
 	minorGraph := graph.BuildGraph(width, height, minorRoadCfg.DSep, minorStreamlines)
 
-	return city.City{MainRoads: mainGraph, MajorRoads: majorGraph, MinorRoads: minorGraph}
+	polygons := graph.DetectPolygons(minorGraph)
+
+	return city.City{MainRoads: mainGraph, MajorRoads: majorGraph, MinorRoads: minorGraph, Polygons: polygons}
 }
 
 func traceStreamlines(
